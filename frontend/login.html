@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - AI Intelligence Hub</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #0a0a0f;
+            color: #e0e0ff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .login-container {
+            background: #1a1a2e;
+            padding: 40px;
+            border-radius: 16px;
+            width: 400px;
+            max-width: 90%;
+            border: 1px solid #2a2a4a;
+        }
+        h1 { color: #7b68ee; margin-bottom: 30px; text-align: center; }
+        .form-group { margin-bottom: 20px; position: relative; }
+        label { display: block; margin-bottom: 8px; font-size: 14px; color: #888; }
+        input {
+            width: 100%;
+            padding: 12px 16px;
+            background: #111118;
+            border: 1px solid #2a2a4a;
+            border-radius: 8px;
+            color: #e0e0ff;
+            font-size: 14px;
+        }
+        input:focus { outline: none; border-color: #7b68ee; }
+        
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            top: 40px;
+            cursor: pointer;
+            color: #888;
+            font-size: 20px;
+            user-select: none;
+        }
+        .toggle-password:hover { color: #e0e0ff; }
+
+        button {
+            width: 100%;
+            padding: 14px;
+            background: #7b68ee;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        button:hover { background: #9b88ff; }
+        button:disabled { background: #444; cursor: not-allowed; }
+        .error { color: #ff6b6b; margin-top: 15px; text-align: center; display: none; }
+        .info { color: #888; text-align: center; margin-top: 15px; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h1>🔐 Login</h1>
+        <div class="form-group">
+            <label>Username</label>
+            <input type="text" id="username" value="aftab" placeholder="Enter username">
+        </div>
+        <div class="form-group">
+            <label>Password</label>
+            <input type="password" id="password" value="password123" placeholder="Enter password">
+            <span class="toggle-password" id="togglePassword">👁️</span>
+        </div>
+        <button id="loginBtn" onclick="performLogin()">Login</button>
+        <div class="error" id="errorMsg">Invalid credentials</div>
+        <div class="info">Default: aftab / password123</div>
+    </div>
+
+    <script>
+        const togglePassword = document.querySelector('#togglePassword');
+        const passwordInput = document.querySelector('#password');
+
+        togglePassword.addEventListener('click', function (e) {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            this.textContent = type === 'password' ? '👁️' : '🙈';
+        });
+
+        async function performLogin() {
+            // OPTIMIZED: Double-trim to remove hidden Unicode spaces
+            const username = document.getElementById('username').value.trim().replace(/\s+/g, '');
+            const password = document.getElementById('password').value.trim().replace(/\s+/g, '');
+
+            const errorMsg = document.getElementById('errorMsg');
+            const loginBtn = document.getElementById('loginBtn');
+
+            errorMsg.style.display = 'none';
+            loginBtn.disabled = true;
+            loginBtn.textContent = 'Logging in...';
+
+            try {
+                const formData = new FormData();
+                formData.append('username', username);
+                formData.append('password', password);
+
+                // OPTIMIZED: Let the browser automatically set Content-Type: multipart/form-data
+                const res = await fetch('/auth/login', {
+                    method: 'POST',
+                    body: formData,
+                    headers: {
+                        'Accept': 'application/json'
+                    }
+                });
+
+                const data = await res.json();
+
+                if (res.ok) {
+                    localStorage.setItem('auth_token', data.access_token);
+                    localStorage.setItem('auth_user', JSON.stringify({ name: data.username }));
+                    // Redirect to root (serves index.html)
+                    window.location.href = '/';
+                } else {
+                    errorMsg.textContent = data.detail || 'Login failed';
+                    errorMsg.style.display = 'block';
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = 'Login';
+                }
+            } catch (err) {
+                errorMsg.textContent = 'Connection error. Is the server running?';
+                errorMsg.style.display = 'block';
+                loginBtn.disabled = false;
+                loginBtn.textContent = 'Login';
+            }
+        }
+    </script>
+</body>
+</html>
