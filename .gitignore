@@ -84,3 +84,19 @@ desktop.ini
 *.temp
 *.log
 *.pid
+
+# ============================================================
+# 🔥 NEW: DEPLOYMENT & SECURITY SAFETY NET
+# ============================================================
+
+# Ignore local deployment artifacts (avoid deploying wrong files)
+.deploy/
+.DS_Store
+
+# Ignore secrets files if accidentally created
+*.secret
+*.pem
+*.key
+
+# Keep the root directory clean
+*.pyc
