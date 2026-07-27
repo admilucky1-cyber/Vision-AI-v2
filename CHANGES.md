@@ -1,83 +1,93 @@
-# What was fixed
+# Changes — this pass
 
-## Critical bugs
-1. **Double `/auth` prefix (main.py)** — `login.py` already declares
-   `prefix="/auth"`. main.py was adding a *second* `/auth` on top of
-   the whole router bundle, so `/chat/send` became `/auth/chat/send`,
-   `/upload/*` became `/auth/upload/*`, and `/auth/login` became
-   `/auth/auth/login`. None of these matched what index.html/login.html
-   actually called. Fixed: `app.include_router(main_router)` — no
-   extra prefix, since each sub-router sets its own.
+Note: the CHANGES.md shipped in this zip described fixes (double `/auth`
+prefix, files removed, upload.py deleted, etc.) that didn't match what
+was actually in the code — e.g. it said `vector_store.py`, `flux_image.py`,
+`image_gen.py`, `style.css`, and `routes/upload.py` were all removed, but
+every one of them was still present and wired in. Treat that file as
+stale; this one reflects what was actually verified and changed just now.
 
-2. **Root route always served login.html (main.py)** — even after a
-   successful login, `/` returned `frontend/login.html` again, so
-   users could never actually reach the chat UI. `index.html` already
-   has its own `checkAuth()` that redirects unauthenticated users to
-   `/frontend/login.html`, so root now serves `frontend/index.html`
-   and lets that logic do its job.
+## Critical: login was breaking because of a Python import-order gotcha
+`main.py` already had router-isolation logic (each of login/chat/upload/
+upgrade is imported independently, in its own try/except, so one broken
+router can't take the others down). But `routes/__init__.py` did this
+at the top of the file, unconditionally:
 
-3. **Dead YouTube logging middleware (main.py)** — was checking
-   `request.url.path.startswith("/youtube")`, but the yt-dlp
-   download/format endpoints actually live under `/upload/*`. It never
-   logged anything. Repointed at `/upload` instead of deleting it.
+```python
+from .chat import router as chat_router
+from .login import router as login_router
+...
+```
 
-## Removed (confirmed unused/orphaned — nothing imported them)
-- `vector_store.py` — chromadb/sentence-transformers RAG store, never
-  called; chat.py uses its own in-memory dict cache instead.
-- `flux_image.py` — duplicate of the `generate_with_flux()` already
-  inside image_gen.py, never called.
-- `style.css` — never linked; index.html has its own inline `<style>`.
-- `image_gen.py` — diagram generation feature, built but never wired
-  into chat.py. Removed per your call — re-add later if you want
-  diagrams in chat answers.
+Importing *any* submodule, e.g. `routes.login`, always executes the
+parent package's `__init__.py` first — that's just how Python import
+works. So the moment `chat.py`'s import chain hit a problem (see next
+item), `routes/__init__.py` itself raised, which broke importing
+`routes.login` too, even though login doesn't depend on chat at all.
+This silently defeated the isolation main.py was built for and is the
+real reason login kept failing. **Fixed**: stripped `routes/__init__.py`
+down to a docstring — nothing actually imports the aggregated router it
+used to build, so this is safe.
 
-## Restructured
-Files were flattened in the upload; main.py's imports
-(`from routes import ...`, `from services.llm import ...`, etc.)
-expect a package layout, so:
-- `chat.py`, `login.py`, `upload.py`, `__init__.py` → `routes/`
-- `llm.py`, `multimodal.py`, `search.py`, `self_optimizer.py` → `services/`
-- `index.html`, `login.html` → `frontend/`
-Also stripped a stray UTF-8 BOM character from `routes/__init__.py`
-that would have caused a SyntaxError on import.
+## Fragile diagram dependencies could take chat.py down
+`services/image_gen.py` imported `matplotlib`, `plotly`, and `graphviz`
+at module load time with no fallback. `routes/chat.py` imports this
+module directly, so if any one of those three wasn't installed on the
+deploy target (graphviz in particular also needs a system `dot` binary,
+not just the Python package), the whole chat router failed to load —
+and per the bug above, that used to cascade into login too. **Fixed**:
+each engine now imports inside its own try/except and sets an
+`_AVAILABLE` flag; the seven `draw_*()` functions check their flag and
+return a normal `{"success": False, "error": "..."}` instead of raising.
 
-## Still worth doing (not changed — your call)
-- `login.py` stores/compares the password in **plain text** with a
-  single hardcoded user. Fine for solo testing, not for anything
-  public. Swap in `passlib`/`bcrypt` hashing when ready.
-- `login.html` pre-fills the password field with `password123` in
-  plain view — remove before showing this to anyone else.
-- `SECRET_KEY` is read from `.env` with no fallback/validation — if
-  it's missing, token creation fails silently. Add a startup check.
-- No `requirements.txt` was included, so dependency versions weren't
-  verified (chromadb/sentence-transformers can now be dropped from it
-  since vector_store.py is gone).
+## XSS in the chat UI (frontend/index.html)
+AI answers were rendered with `marked.parse(text)` and inserted via
+`innerHTML` with no sanitization. Since answers can reflect content
+from uploaded documents or web search results — both effectively
+untrusted input — a crafted document or a prompt-injection attempt
+could get raw `<script>`/`onerror=` markup to execute in the user's
+session, where the JWT access token lives in `localStorage`. **Fixed**:
+added DOMPurify and sanitize marked's output before insertion. Also
+rebuilt the AI-image grid using real DOM nodes instead of string
+interpolation, and escaped `showToast()` messages (some come from
+`data.detail`, i.e. server error text).
 
-## Removed by you (this round)
-- `routes/upload.py` (the yt-dlp video downloader) — deleted per your
-  request. Cleaned up everything that referenced it so nothing's left
-  dangling:
-  - `routes/__init__.py` no longer imports/includes `upload_router`
-  - `main.py`: dropped the `downloads/` directory creation, the
-    `/downloads` static mount (was mounted twice), and the media
-    logging middleware (had nothing left to log without `/upload/*`)
-  - `slowapi` is still imported/configured in `main.py` (rate-limit
-    exception handler) but nothing currently uses `@limiter.limit(...)`
-    since that only lived in the removed file — harmless to leave in
-    place if you want rate limiting on future routes, or remove the
-    slowapi setup entirely if you don't.
-  - Since `upload.py` is gone, `yt-dlp` is no longer a dependency —
-    drop it from your requirements if you'd already added it.
+## No brute-force protection on login/register
+`routes/login.py` already had `slowapi`'s `Limiter` instantiated but
+never applied to `/auth/login` or `/auth/register`. **Fixed**: added
+`@limiter.limit("10/minute")` to login and `@limiter.limit("5/minute")`
+to register.
 
-## Fixed: 404 on /frontend/login.html (and any other static asset)
-`main.py` was resolving `frontend/`, `static/`, `uploads/`, `cache/`,
-`logs/`, and `app.log` as paths **relative to your terminal's current
-directory** when you run `python main.py` — not relative to where
-`main.py` itself lives. If you launch the server from a different
-folder than the project root (a common IDE/PowerShell gotcha), FastAPI
-can't find `frontend/login.html` and returns a 404, even though the
-file is right there on disk.
+## requirements.txt
+- Added `itsdangerous` — required by `starlette.middleware.sessions.SessionMiddleware`,
+  which `main.py` adds unconditionally. Missing it can crash the app at
+  startup.
+- Removed `passlib[bcrypt]` — `routes/login.py` calls `bcrypt.hashpw`/
+  `bcrypt.checkpw` directly, passlib was never actually used. Added a
+  plain `bcrypt>=4.0.0` pin instead (this also sidesteps the known
+  passlib+bcrypt>=4.1 `__about__` incompatibility, since passlib isn't
+  in the path at all now).
+- Removed `chromadb` / `sentence-transformers` — nothing imports them
+  now that the two dead vector-store duplicates are gone (next item).
 
-Fixed by anchoring every one of those paths to `BASE_DIR = Path(__file__).resolve().parent`
-— the server now finds its own files correctly no matter which
-directory you launch it from.
+## Removed confirmed-dead duplicate files
+Neither of these was imported anywhere in the codebase:
+- `services/rag/vector_store.py`
+- `services/hf/flux_image.py` (duplicate FLUX image-gen helper —
+  `services/image_gen.py` already has its own `generate_with_flux()`)
+
+## Still worth doing (not changed — flagging for you)
+- `frontend/login.html` shows the default demo password
+  (`aftab` / `password123`) directly on the page. Fine for local dev,
+  remove that line before this is reachable by anyone else.
+- `SECRET_KEY`/`SESSION_SECRET` fall back to `"change-me-in-production"`
+  with only a startup log warning, not a hard failure. Worth making
+  `AppConfig.validate()` refuse to start in production without a real
+  secret.
+- `frontend/static/css/style.css` isn't linked from any HTML file —
+  `index.html`, `login.html`, and `upgrade.html` all use their own
+  inline `<style>` blocks. It's dead weight right now; let me know if
+  you want it merged in as a shared stylesheet or removed.
+- CORS/TrustedHost both default to `allow_origins=["*"]` /
+  `allowed_hosts=["*"]` unless `ALLOWED_HOSTS` is set in `.env` — fine
+  for local dev, set `ALLOWED_HOSTS` explicitly before this is public.

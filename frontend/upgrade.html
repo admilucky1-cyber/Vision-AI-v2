@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Upgrade Plan - Vision AI v2.0</title>
+<!-- Global Theme -->
+<link rel="stylesheet" href="/frontend/static/css/style.css">
+<!-- Page Layout System -->
+<link rel="stylesheet" href="/frontend/static/css/pages.css">
+<style>
+    /* Page-Specific Styles */
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font-family); background: var(--bg-deep); color: var(--text-main); }
+
+    .current-plan-banner {
+        max-width: 720px; margin: 20px auto 0; padding: 14px 20px;
+        background: rgba(0, 198, 255, 0.08); border: 1px solid rgba(0, 198, 255, 0.3);
+        border-radius: 14px; text-align: center; font-size: 14px; color: var(--text-main); display: none;
+    }
+    .current-plan-banner strong { color: #00C6FF; }
+
+    .plans-grid {
+        max-width: 1180px; margin: 40px auto; padding: 0 24px 60px;
+        display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 22px;
+    }
+
+    .plan-card {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        padding: 28px 24px;
+        display: flex;
+        flex-direction: column;
+        position: relative;
+        transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease, background .3s ease;
+    }
+    .plan-card:hover { transform: translateY(-4px); border-color: rgba(0,198,255,0.35); box-shadow: var(--shadow-lg); }
+    .plan-card.current { border-color: #00C6FF; box-shadow: 0 0 0 1px #00C6FF, var(--shadow-lg); }
+    .plan-card.popular::before {
+        content: 'MOST POPULAR';
+        position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+        background: linear-gradient(135deg, #00C6FF, #7B68EE);
+        color: #fff; font-size: 10px; font-weight: 700; letter-spacing: 0.6px;
+        padding: 5px 14px; border-radius: 20px;
+    }
+
+    .plan-name { font-size: 19px; font-weight: 700; margin-bottom: 4px; text-transform: capitalize; color: var(--text-main); }
+    .plan-price { font-size: 34px; font-weight: 800; margin: 10px 0 2px; color: var(--text-main); }
+    .plan-price sup { font-size: 15px; font-weight: 600; vertical-align: super; }
+    .plan-price span.per { font-size: 13px; font-weight: 500; color: var(--text-muted); }
+
+    .plan-features { list-style: none; margin: 18px 0 24px; flex: 1; }
+    .plan-features li {
+        font-size: 13.5px; color: var(--text-main); padding: 7px 0; display: flex; align-items: flex-start; gap: 8px;
+        border-bottom: 1px solid var(--border-subtle);
+    }
+    .plan-features li::before { content: '✓'; color: #00C6FF; font-weight: 700; flex-shrink: 0; }
+
+    .plan-btn {
+        width: 100%; padding: 12px; border-radius: 12px; border: none; cursor: pointer;
+        font-weight: 600; font-size: 14px; transition: all .2s;
+    }
+    .plan-btn.upgrade { background: linear-gradient(135deg, #00C6FF, #7B68EE); color: #fff; }
+    .plan-btn.upgrade:hover:not(:disabled) { transform: scale(1.02); box-shadow: 0 8px 20px rgba(0,198,255,0.25); }
+    .plan-btn.current-btn { background: rgba(0,198,255,0.12); color: #00C6FF; cursor: default; }
+    .plan-btn.downgrade { background: transparent; color: #ef4444; border: 1px solid rgba(239,68,68,0.35); }
+    .plan-btn.downgrade:hover { background: rgba(239,68,68,0.08); }
+    .plan-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .status-msg {
+        max-width: 720px; margin: 0 auto 20px; padding: 12px 18px; border-radius: 12px;
+        font-size: 14px; text-align: center; display: none;
+    }
+    .status-msg.show { display: block; }
+    .status-msg.success { background: rgba(34,197,94,0.1); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+    .status-msg.error { background: rgba(239,68,68,0.1); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+
+    .loading-state { text-align: center; padding: 60px; color: var(--text-muted); }
+    .spinner {
+        width: 32px; height: 32px; border: 3px solid var(--border-color); border-top-color: #00C6FF;
+        border-radius: 50%; margin: 0 auto 14px; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body class="page-view">
+
+<div class="page-topbar">
+    <div class="page-brand">
+        <span class="dot" style="display:inline-block;width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,#00C6FF,#7B68EE);"></span>
+        Vision AI
+    </div>
+    <div class="topbar-actions" style="display:flex; align-items:center; gap:12px;">
+        <!-- 🔥 FIX: Use the theme-toggle-btn class from pages.css -->
+        <button class="theme-toggle-btn" id="themeToggle">🌙</button>
+        <button class="page-back-btn" onclick="window.history.back()">← Back to Chat</button>
+    </div>
+</div>
+
+<div class="page-hero">
+    <h1>Choose Your Plan</h1>
+    <p>Unlock more messages, bigger files, and priority AI models.</p>
+</div>
+
+<div class="current-plan-banner" id="currentPlanBanner"></div>
+<div class="status-msg" id="statusMsg"></div>
+
+<div id="plansContainer">
+    <div class="loading-state"><div class="spinner"></div>Loading plans…</div>
+</div>
+
+<script src="/frontend/static/js/upgrade.js"></script>
+</body>
+</html>
