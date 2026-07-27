@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Vision AI v2.0
 
 > **Production‑grade multi‑modal AI assistant with document processing, diagram generation, and real‑time web search.**
@@ -272,3 +273,7 @@ This project is licensed under the **MIT License** – see the [LICENSE](LICENSE
 3. **Deploy to Render** using the steps in the README.
 
 Your project is now **fully documented, accurate, and ready for the world to see**. 🚀
+=======
+# AI-Lab
+My personal AI training laboratory
+>>>>>>> origin/main
