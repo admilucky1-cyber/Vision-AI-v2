@@ -8,12 +8,12 @@ python-multipart>=0.0.6
 
 # Authentication & Security
 python-jose[cryptography]>=3.3.0
-bcrypt>=4.0.0           # routes/login.py uses bcrypt directly, not passlib
+bcrypt>=4.0.0
 authlib>=1.2.0
-itsdangerous>=2.1.0     # REQUIRED by starlette's SessionMiddleware in main.py
+itsdangerous>=2.1.0
 
 # Data Validation
-pydantic>=2.5.0
+pydantic[email]>=2.5.0
 pydantic-settings>=2.1.0
 
 # Rate Limiting
@@ -29,11 +29,6 @@ httpx>=0.25.0
 
 # Search
 tavily-python>=0.3.0
-
-# NOTE: chromadb / sentence-transformers were removed — the only files
-# that imported them (services/rag/vector_store.py, services/vector_store.py)
-# were dead duplicates never wired into any route. Re-add if you build
-# real vector-based RAG back in.
 
 # Document Processing
 pdfplumber>=0.10.0
@@ -54,8 +49,6 @@ kaleido>=0.2.1
 graphviz>=0.20.1
 Pillow>=10.1.0
 
-# YouTube Download
-yt-dlp>=2023.12.30
-
+# 🔥 RE-ADDED: Vector Store Dependencies (CRITICAL for PDF uploads)
 chromadb>=0.5.0
 sentence-transformers>=2.2.0
