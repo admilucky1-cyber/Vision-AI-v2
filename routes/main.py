@@ -132,31 +132,12 @@ class AppConfig:
 
     @classmethod
     def validate(cls) -> List[str]:
-        """Validate critical configuration. Raises in production on fatal misconfig."""
-        warnings: List[str] = []
-        errors: List[str] = []
-        weak_secrets = {
-            "change-me-in-production",
-            "your-secret-key-here",
-            "change-me",
-            "secret",
-            "changeme",
-            "",
-        }
-        if cls.SECRET_KEY in weak_secrets or len(cls.SECRET_KEY) < 32:
-            msg = "SECRET_KEY is missing, weak, or default. Set a long random SECRET_KEY."
-            if not cls.DEBUG:
-                errors.append(msg)
-            else:
-                warnings.append("WARNING: " + msg)
+        """Validate critical configuration and return warnings."""
+        warnings = []
+        if cls.SECRET_KEY in ("change-me-in-production", "your-secret-key-here", ""):
+            warnings.append("WARNING: Using default SECRET_KEY. Change in production!")
         if not any([cls.GOOGLE_API_KEY, cls.GROQ_API_KEY, cls.DEEPSEEK_API_KEY, cls.OPENROUTER_API_KEY]):
             warnings.append("WARNING: No AI provider API keys configured. Chat will not work.")
-        if not cls.DEBUG and cls.ALLOWED_HOSTS == ["*"]:
-            warnings.append("WARNING: ALLOWED_HOSTS=* in production. Pin to your domain.")
-        if errors:
-            for e in errors:
-                logger.error(e)
-            raise RuntimeError("Fatal configuration error: " + "; ".join(errors))
         return warnings
 
 # ==========================================================
@@ -277,20 +258,6 @@ app.add_exception_handler(429, _rate_limit_exceeded_handler)
 # ==========================================================
 # SECURITY MIDDLEWARE
 # ==========================================================
-
-# Max request body (55 MB) — protects upload endpoints
-MAX_BODY_BYTES = int(os.getenv("MAX_BODY_BYTES", str(55 * 1024 * 1024)))
-
-@app.middleware("http")
-async def limit_body_size(request: Request, call_next):
-    cl = request.headers.get("content-length")
-    if cl and cl.isdigit() and int(cl) > MAX_BODY_BYTES:
-        return JSONResponse(
-            status_code=413,
-            content={"error": "Payload too large", "max_bytes": MAX_BODY_BYTES},
-        )
-    return await call_next(request)
-
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     """Add security headers to all responses."""
@@ -426,13 +393,6 @@ if _failed:
 
 app.include_router(main_router)
 
-# Needed for the admin-only search-dashboard routes below. Matches the
-# same top-level import already used in routes/chat.py and
-# routes/upgrade.py. If routes.login failed to load above, essentially
-# nothing in this app works anyway (chat and upgrade already import this
-# the same way), so this doesn't introduce a new failure mode.
-from routes.login import get_current_active_user
-
 # Health check to debug router issues
 @app.get("/health/routers", tags=["System"])
 async def router_health():
@@ -487,7 +447,6 @@ async def health_check_detailed():
 
 # 1. Mount the entire frontend folder so CSS/JS/Images load properly
 app.mount("/frontend", StaticFiles(directory=str(AppConfig.FRONTEND_DIR)), name="frontend")
-app.mount("/downloads", StaticFiles(directory=str(AppConfig.DOWNLOAD_DIR)), name="downloads")
 
 # 2. Serve index.html
 @app.get("/")
@@ -527,92 +486,29 @@ async def serve_login_html(request: Request):
     raise HTTPException(status_code=404, detail="Login page not found")
 
 # 6. Serve favicon.ico
-@app.get("/robots.txt")
-async def robots_txt():
-    path = AppConfig.FRONTEND_DIR / "robots.txt"
-    if path.exists():
-        return FileResponse(str(path), media_type="text/plain")
-    return JSONResponse({"detail": "not found"}, status_code=404)
-
-
 @app.get("/favicon.ico")
 async def serve_favicon():
-    """Serve site favicon (ICO preferred, PNG fallback)."""
-    fav_dir = AppConfig.FRONTEND_DIR / "static" / "favicon"
-    for name, media in (
-        ("favicon.ico", "image/x-icon"),
-        ("favicon-32x32.png", "image/png"),
-        ("favicon-16x16.png", "image/png"),
-    ):
-        path = fav_dir / name
-        if path.exists() and path.is_file():
-            return FileResponse(str(path), media_type=media)
+    """Serve favicon."""
+    # Your favicon files are in /frontend/static/favicon/
+    favicon_path = AppConfig.FRONTEND_DIR / "static" / "favicon" / "favicon-32x32.png"
+    
+    if favicon_path.exists() and favicon_path.is_file():
+        return FileResponse(str(favicon_path), media_type="image/png")
+    
+    favicon_path_16 = AppConfig.FRONTEND_DIR / "static" / "favicon" / "favicon-16x16.png"
+    if favicon_path_16.exists() and favicon_path_16.is_file():
+        return FileResponse(str(favicon_path_16), media_type="image/png")
+    
     return JSONResponse(content={"detail": "Favicon not found"}, status_code=404)
 
-# 7. Search Cache Dashboard (HTML) + JSON API
-def _require_admin(current_user: dict) -> dict:
-    """Same role check already used in routes/upgrade.py."""
-    if current_user.get("role") != "admin" and current_user.get("username") != "admin":
-        raise HTTPException(status_code=403, detail="Admin only")
-    return current_user
-
-@app.get("/admin/search")
-@app.get("/admin/search/")
+# 7. 🟢 Serve the Search Dashboard HTML (REPLACED THE JSON ROUTE)
+@app.get("/admin/search/stats")
 async def serve_search_dashboard():
-    """Serve the search cache dashboard HTML page.
-
-    Auth is enforced client-side (Bearer token from localStorage) and on
-    the JSON APIs below. Browser navigation cannot send Authorization
-    headers, so this HTML route must stay public or the page never loads.
-    """
+    """Serve the search cache dashboard HTML."""
     dashboard_path = AppConfig.FRONTEND_DIR / "admin" / "search-dashboard.html"
     if dashboard_path.exists() and dashboard_path.is_file():
         return FileResponse(str(dashboard_path), media_type="text/html")
     raise HTTPException(status_code=404, detail="Search dashboard not found")
-
-
-@app.get("/admin/search/stats")
-async def search_stats_api(current_user: dict = Depends(get_current_active_user)):
-    """JSON stats for the search-cache dashboard. Previously had no auth at
-    all -- reachable by anyone who knew the URL, no login required."""
-    _require_admin(current_user)
-    try:
-        from services.search import get_search_stats
-        return get_search_stats()
-    except Exception as e:
-        logger.error(f"Search stats error: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"status": "error", "detail": str(e), "total_entries": 0, "max_cache_size": 0, "cache_duration_seconds": 0, "recent_queries": []},
-        )
-
-
-@app.post("/admin/search/clear")
-async def search_clear_api(current_user: dict = Depends(get_current_active_user)):
-    """Clear the search cache. Same admin gate as the other search routes."""
-    _require_admin(current_user)
-    try:
-        from services.search import clear_search_cache
-        clear_search_cache()
-        return {"status": "ok", "message": "Search cache cleared"}
-    except Exception as e:
-        logger.error(f"Search clear error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# 8. Admin payment verification dashboard (manual Easypaisa/bank reviews)
-@app.get("/admin/payments")
-@app.get("/admin/payments/")
-async def serve_payments_dashboard():
-    """Admin payment verification UI (HTML).
-
-    Same pattern as /admin/search: page is public HTML; /upgrade/admin/*
-    JSON APIs enforce admin JWT. Client redirects to login if no token.
-    """
-    path = AppConfig.FRONTEND_DIR / "admin" / "payments.html"
-    if path.exists() and path.is_file():
-        return FileResponse(str(path), media_type="text/html")
-    raise HTTPException(status_code=404, detail="Payments dashboard not found")
 
 # ==========================================================
 # CATCH-ALL ROUTE FOR SPA (Keep this at the BOTTOM!)
@@ -620,7 +516,7 @@ async def serve_payments_dashboard():
 @app.get("/{path:path}")
 async def catch_all(path: str):
     """Catch-all route for SPA frontends."""
-    if path.startswith(("api/", "auth/", "upgrade/", "upload/", "admin/", "chat/", "health")):
+    if path.startswith("api/") or path.startswith("auth/") or path.startswith("upgrade/") or path.startswith("upload/"):
         raise HTTPException(status_code=404, detail="API endpoint not found")
     
     index_path = AppConfig.FRONTEND_DIR / "index.html"
@@ -656,35 +552,14 @@ signal.signal(signal.SIGTERM, shutdown_handler)
 if __name__ == "__main__":
     import uvicorn
     try:
-        run_kwargs = dict(
-            app="main:app",
+        uvicorn.run(
+            "main:app",
             host=AppConfig.HOST,
             port=AppConfig.PORT,
+            reload=AppConfig.DEBUG,
             log_config=None,
             access_log=True,
-            proxy_headers=True,
-            forwarded_allow_ips="*",
         )
-        if AppConfig.DEBUG:
-            run_kwargs["reload"] = True
-            # Critical: do NOT reload when yt-dlp writes into downloads/ (kills active downloads)
-            run_kwargs["reload_excludes"] = [
-                "downloads/*",
-                "downloads/**",
-                "uploads/*",
-                "uploads/**",
-                "cache/*",
-                "cache/**",
-                "data/*",
-                "data/**",
-                "logs/*",
-                "logs/**",
-                "*/__pycache__/*",
-                "*.pyc",
-            ]
-        else:
-            run_kwargs["workers"] = int(os.getenv("WEB_WORKERS", "2"))
-        uvicorn.run(**run_kwargs)
     except KeyboardInterrupt:
         print("\n\n🛑 Shutting down gracefully...")
         try:

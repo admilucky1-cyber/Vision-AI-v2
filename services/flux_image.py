@@ -13,22 +13,65 @@ Supported Models (Free):
 import os
 import base64
 import asyncio
-import requests
+import time
+import logging
+from typing import Dict, Any, Optional, List, Tuple
 from dotenv import load_dotenv
+import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 load_dotenv()
 
+# ==========================================================
+# CONFIGURATION
+# ==========================================================
 HF_TOKEN = os.getenv("HF_TOKEN")
 API_BASE = "https://api-inference.huggingface.co/models"
+MAX_RETRIES = 3
+TIMEOUT_SECONDS = 90
 
-# 🔥 Updated list of free models to try
-MODELS = [
+# Updated list of free models to try (using a tuple to prevent accidental modification)
+MODELS = (
     "black-forest-labs/FLUX.1-dev",           # Primary (Fast, high quality)
     "stabilityai/stable-diffusion-3.5-large", # Backup (Excellent quality, free)
     "black-forest-labs/FLUX.1-schnell",       # Fallback (Very fast)
-]
+    "dreamshaper/XL-1-0",                     # Additional fallback
+    "wavymulder/Analog-Diffusion",            # Artistic style fallback
+)
 
-async def generate_image_hf(prompt: str, model_index: int = 0) -> dict:
+# Setup logging
+logger = logging.getLogger("vision-ai.image_gen")
+
+# ==========================================================
+# REQUEST HANDLER WITH RETRY LOGIC
+# ==========================================================
+def create_session_with_retries() -> requests.Session:
+    """Create a requests session with retry logic."""
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=MAX_RETRIES,
+        backoff_factor=1,
+        status_forcelist=[429, 500, 502, 503, 504],
+        allowed_methods=["HEAD", "GET", "POST", "PUT", "DELETE", "OPTIONS", "TRACE"],
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+# ==========================================================
+# IMAGE GENERATION
+# ==========================================================
+async def generate_image_hf(
+    prompt: str, 
+    model_index: int = 0,
+    negative_prompt: Optional[str] = None,
+    width: int = 1024,
+    height: int = 1024,
+    guidance_scale: float = 7.5,
+    num_inference_steps: int = 25
+) -> Dict[str, Any]:
     """
     Generate an image using the Hugging Face Inference API.
     Automatically rotates through free models and handles queues.
@@ -36,53 +79,220 @@ async def generate_image_hf(prompt: str, model_index: int = 0) -> dict:
     Args:
         prompt (str): The text prompt for the image generation.
         model_index (int): Which model to try first (0 = primary).
+        negative_prompt (str, optional): Negative prompt for better results.
+        width (int): Image width (default: 1024).
+        height (int): Image height (default: 1024).
+        guidance_scale (float): Guidance scale (default: 7.5).
+        num_inference_steps (int): Number of inference steps (default: 25).
 
     Returns:
-        dict: Success status, image_data (base64), or error message.
+        Dict[str, Any]: Success status, image_data (base64), or error message.
     """
     if not HF_TOKEN:
-        return {"success": False, "error": "HF_TOKEN not configured in .env"}
+        logger.error("HF_TOKEN not configured in .env")
+        return {
+            "success": False, 
+            "error": "HF_TOKEN not configured in .env. Please add your Hugging Face token to the .env file."
+        }
 
-    # Try each model in order
-    for i in range(model_index, len(MODELS)):
-        model_id = MODELS[i]
-        url = f"{API_BASE}/{model_id}"
-        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-        payload = {"inputs": prompt}
+    # Validate inputs
+    if not prompt or len(prompt.strip()) < 3:
+        return {
+            "success": False,
+            "error": "Prompt must be at least 3 characters long."
+        }
 
-        try:
-            print(f"🖼️ Generating image with {model_id}...")
-            response = requests.post(url, headers=headers, json=payload, timeout=90)
+    # Normalize dimensions
+    width, height = validate_image_parameters(width, height)
 
-            # Handle Hugging Face waiting queues (Status 503 means "Model is loading, wait")
-            if response.status_code == 503:
-                print(f"⏳ {model_id} is loading. Waiting 5 seconds...")
-                await asyncio.sleep(5)
-                response = requests.post(url, headers=headers, json=payload, timeout=90)
-
-            if response.status_code == 200:
-                image_base64 = base64.b64encode(response.content).decode('utf-8')
-                return {
-                    "success": True,
-                    "image_data": image_base64,
-                    "provider": f"Hugging Face ({model_id})"
-                }
-            else:
-                print(f"⚠️ {model_id} returned status {response.status_code}. Trying next model...")
-
-        except requests.exceptions.Timeout:
-            print(f"⏱️ {model_id} timed out. Trying next model...")
-        except Exception as e:
-            print(f"❌ Error with {model_id}: {e}. Trying next model...")
-
-    # If all models fail
-    return {
-        "success": False,
-        "error": "All Hugging Face models failed. Please try a simpler prompt or check your token."
+    # Create payload with parameters
+    payload = {
+        "inputs": prompt,
+        "parameters": {
+            "width": width,
+            "height": height,
+            "guidance_scale": guidance_scale,
+            "num_inference_steps": num_inference_steps,
+        }
     }
 
-async def generate_flux_image(prompt: str) -> dict:
+    if negative_prompt:
+        payload["parameters"]["negative_prompt"] = negative_prompt
+
+    # Try each model in order
+    attempted_models = []
+    session = None
+
+    try:
+        for i in range(model_index, len(MODELS)):
+            model_id = MODELS[i]
+            url = f"{API_BASE}/{model_id}"
+            headers = {
+                "Authorization": f"Bearer {HF_TOKEN}",
+                "Content-Type": "application/json",
+            }
+            attempted_models.append(model_id)
+
+            try:
+                logger.info(f"🖼️ Generating image with {model_id}...")
+                
+                session = create_session_with_retries()
+                response = session.post(
+                    url, 
+                    headers=headers, 
+                    json=payload, 
+                    timeout=TIMEOUT_SECONDS
+                )
+
+                # Handle Hugging Face waiting queues (Status 503 means "Model is loading, wait")
+                if response.status_code == 503:
+                    wait_time = int(response.headers.get("X-Wait-Time", 5))
+                    logger.info(f"⏳ {model_id} is loading. Waiting {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                    
+                    # Retry with the same model
+                    response = session.post(
+                        url, 
+                        headers=headers, 
+                        json=payload, 
+                        timeout=TIMEOUT_SECONDS
+                    )
+
+                if response.status_code == 200:
+                    # Check if response is actual image data or error JSON
+                    content_type = response.headers.get("Content-Type", "")
+                    if "application/json" in content_type:
+                        error_data = response.json()
+                        if "error" in error_data:
+                            logger.warning(f"{model_id} returned error: {error_data['error']}")
+                            continue
+
+                    image_base64 = base64.b64encode(response.content).decode('utf-8')
+                    logger.info(f"✅ Image generated successfully with {model_id}")
+                    return {
+                        "success": True,
+                        "image_data": image_base64,
+                        "provider": f"Hugging Face ({model_id})",
+                        "model": model_id,
+                        "width": width,
+                        "height": height,
+                    }
+                else:
+                    logger.warning(f"⚠️ {model_id} returned status {response.status_code}. Trying next model...")
+
+            except requests.exceptions.Timeout:
+                logger.warning(f"⏱️ {model_id} timed out after {TIMEOUT_SECONDS}s. Trying next model...")
+            except requests.exceptions.ConnectionError:
+                logger.warning(f"🔌 Connection error with {model_id}. Trying next model...")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"❌ Request error with {model_id}: {e}. Trying next model...")
+            except Exception as e:
+                logger.error(f"❌ Unexpected error with {model_id}: {e}. Trying next model...")
+            finally:
+                if session:
+                    session.close()
+                    session = None
+
+    finally:
+        if session:
+            session.close()
+
+    # If all models fail
+    logger.error("All Hugging Face models failed")
+    return {
+        "success": False,
+        "error": "All Hugging Face models failed. Please try a simpler prompt, check your token, or try again later.",
+        "attempted_models": attempted_models,
+    }
+
+async def generate_flux_image(prompt: str, **kwargs) -> Dict[str, Any]:
     """
     Legacy wrapper function to maintain backward compatibility.
+    Supports all parameters from generate_image_hf via kwargs.
     """
-    return await generate_image_hf(prompt, model_index=0)
+    return await generate_image_hf(prompt, model_index=0, **kwargs)
+
+async def generate_image_with_fallback(
+    prompt: str,
+    preferred_model: str = "black-forest-labs/FLUX.1-dev",
+    **kwargs
+) -> Dict[str, Any]:
+    """
+    Generate image with a preferred model, with fallback to other models.
+    
+    Args:
+        prompt (str): The text prompt.
+        preferred_model (str): Preferred model ID to try first.
+        **kwargs: Additional parameters for generate_image_hf.
+    
+    Returns:
+        Dict[str, Any]: Result containing image_data or error.
+    """
+    # Try preferred model first
+    if preferred_model in MODELS:
+        try:
+            model_index = MODELS.index(preferred_model)
+            result = await generate_image_hf(prompt, model_index=model_index, **kwargs)
+            if result["success"]:
+                return result
+        except ValueError:
+            logger.warning(f"Preferred model '{preferred_model}' not found in MODELS list.")
+    
+    # Fall back to default rotation
+    return await generate_image_hf(prompt, model_index=0, **kwargs)
+
+# ==========================================================
+# UTILITY FUNCTIONS
+# ==========================================================
+def estimate_generation_time(model_id: str) -> int:
+    """
+    Estimate generation time based on model.
+    
+    Args:
+        model_id (str): The model ID.
+    
+    Returns:
+        int: Estimated time in seconds.
+    """
+    if "schnell" in model_id:
+        return 10
+    elif "dev" in model_id:
+        return 20
+    elif "large" in model_id:
+        return 30
+    else:
+        return 15
+
+def validate_image_parameters(width: int, height: int) -> Tuple[int, int]:
+    """
+    Validate and normalize image dimensions.
+    
+    Args:
+        width (int): Desired width.
+        height (int): Desired height.
+    
+    Returns:
+        Tuple[int, int]: Normalized (width, height).
+    """
+    # Clamp values to valid range
+    width = max(256, min(2048, width))
+    height = max(256, min(2048, height))
+    
+    # Ensure dimensions are multiples of 8 (better performance)
+    width = (width // 8) * 8
+    height = (height // 8) * 8
+    
+    return width, height
+
+# ==========================================================
+# EXPORTS
+# ==========================================================
+__all__ = [
+    "generate_image_hf",
+    "generate_flux_image",
+    "generate_image_with_fallback",
+    "estimate_generation_time",
+    "validate_image_parameters",
+]
+
+logger.info("👁️ Vision AI Hugging Face Image Generator v2.0 - Ready")

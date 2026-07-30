@@ -16,10 +16,15 @@ import os
 import base64
 import io
 import logging
+import asyncio
 import requests
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple, Any
+from datetime import datetime
 
-logger = logging.getLogger("vision-ai")
+# ==========================================================
+# LOGGING SETUP
+# ==========================================================
+logger = logging.getLogger("vision-ai.image_gen")
 
 # ==========================================================
 # OPTIONAL LIBRARY LOADING (Each engine degrades gracefully)
@@ -39,8 +44,11 @@ except ImportError as e:
 # Numpy
 try:
     import numpy as np
+    NUMPY_AVAILABLE = True
 except ImportError:
+    NUMPY_AVAILABLE = False
     np = None
+    logger.warning("numpy unavailable, some charts may be disabled")
 
 # Pandas
 try:
@@ -74,14 +82,16 @@ try:
     PIL_AVAILABLE = True
 except ImportError:
     PIL_AVAILABLE = False
+    logger.warning("PIL unavailable, image validation disabled")
 
 # ==========================================================
 # CONFIGURATION
 # ==========================================================
 HF_TOKEN = os.getenv("HF_TOKEN")
-MIN_IMAGE_SIZE = 8000
+MIN_IMAGE_SIZE = 8000  # Minimum valid image size in bytes
+MAX_IMAGE_SIZE = 20 * 1024 * 1024  # 20MB max
 
-# 🟢 Google Custom Search API Config
+# Google Custom Search API Config
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 GOOGLE_ENGINE_ID = os.getenv("GOOGLE_ENGINE_ID")
 
@@ -99,108 +109,154 @@ QUALITY_COLORS = {
 # ==========================================================
 def fig_to_base64(fig) -> str:
     """Convert matplotlib figure to base64 PNG."""
-    buf = io.BytesIO()
-    fig.savefig(buf, format='png', dpi=200, facecolor='white', edgecolor='none', bbox_inches='tight')
-    buf.seek(0)
-    img = base64.b64encode(buf.read()).decode('utf-8')
-    plt.close(fig)
-    return img
+    try:
+        buf = io.BytesIO()
+        fig.savefig(buf, format='png', dpi=200, facecolor='white', edgecolor='none', bbox_inches='tight')
+        buf.seek(0)
+        img = base64.b64encode(buf.read()).decode('utf-8')
+        plt.close(fig)
+        return img
+    except Exception as e:
+        logger.error(f"Matplotlib conversion failed: {e}")
+        raise
 
 def plotly_to_base64(fig) -> str:
     """Convert plotly figure to base64 PNG."""
     try:
         img_bytes = fig.to_image(format="png")
         return base64.b64encode(img_bytes).decode('utf-8')
-    except Exception:
+    except Exception as e1:
         try:
+            # Fallback to kaleido
             import plotly.io as pio
             pio.kaleido.scope.default_format = 'png'
             img_bytes = pio.kaleido.scope.transform(fig, format='png')
             return base64.b64encode(img_bytes).decode('utf-8')
         except Exception as e2:
-            raise Exception(f"Plotly image conversion failed: {e2}")
+            raise Exception(f"Plotly image conversion failed: {e1}, {e2}")
 
 # ==========================================================
 # 🚀 GOOGLE REAL IMAGE SEARCH
 # ==========================================================
-async def search_real_image(query: str) -> dict:
+async def search_real_image(query: str) -> Dict[str, Any]:
     """Searches Google for a real, high-quality image."""
     if not GOOGLE_API_KEY or not GOOGLE_ENGINE_ID:
+        logger.warning("Google API keys missing")
         return {"success": False, "error": "Google API keys missing"}
 
     try:
         headers = {"User-Agent": "VisionAI/2.0"}
         
-        url = f"https://www.googleapis.com/customsearch/v1?key={GOOGLE_API_KEY}&cx={GOOGLE_ENGINE_ID}&q={query}+diagram&searchType=image&num=1&imgSize=large&safe=off"
+        # Try with diagram search first
+        search_terms = [
+            f"{query} diagram",
+            f"{query} chart",
+            f"{query} illustration",
+            f"{query} graph"
+        ]
         
-        res = requests.get(url, headers=headers, timeout=10)
-        data = res.json()
+        for term in search_terms:
+            url = f"https://www.googleapis.com/customsearch/v1?key={GOOGLE_API_KEY}&cx={GOOGLE_ENGINE_ID}&q={term}&searchType=image&num=1&imgSize=large&safe=active"
 
-        # Fallback search term
-        if "items" not in data or len(data["items"]) == 0:
-            url = f"https://www.googleapis.com/customsearch/v1?key={GOOGLE_API_KEY}&cx={GOOGLE_ENGINE_ID}&q={query}+chart&searchType=image&num=1&imgSize=large&safe=off"
-            res = requests.get(url, headers=headers, timeout=10)
+            res = await asyncio.to_thread(requests.get, url, headers=headers, timeout=10)
             data = res.json()
 
-        if "items" in data and len(data["items"]) > 0:
-            image_url = data["items"][0]["link"]
-            img_res = requests.get(image_url, headers=headers, timeout=10)
-            if img_res.status_code == 200:
-                img_b64 = base64.b64encode(img_res.content).decode('utf-8')
-                return {"success": True, "image_data": img_b64, "provider": "Google Image Search"}
+            if "items" in data and len(data["items"]) > 0:
+                image_url = data["items"][0]["link"]
+
+                # Validate image URL
+                if not image_url.startswith(('http://', 'https://')):
+                    continue
+
+                img_res = await asyncio.to_thread(requests.get, image_url, headers=headers, timeout=10)
+                if img_res.status_code == 200:
+                    # Check image size
+                    content = img_res.content
+                    if len(content) < MIN_IMAGE_SIZE:
+                        logger.warning(f"Image too small: {len(content)} bytes")
+                        continue
+                    if len(content) > MAX_IMAGE_SIZE:
+                        logger.warning(f"Image too large: {len(content)} bytes")
+                        continue
+                        
+                    img_b64 = base64.b64encode(content).decode('utf-8')
+                    return {
+                        "success": True, 
+                        "image_data": img_b64, 
+                        "provider": "Google Image Search",
+                        "source_url": image_url
+                    }
         
-        return {"success": False, "error": "No images found"}
+        return {"success": False, "error": "No suitable images found"}
+    except requests.exceptions.Timeout:
+        return {"success": False, "error": "Google search timed out"}
     except Exception as e:
+        logger.error(f"Google search error: {e}")
         return {"success": False, "error": str(e)}
 
 # ==========================================================
 # PLOTLY RENDERERS (STATISTICAL CHARTS)
 # ==========================================================
-def draw_bar_chart() -> dict:
+def draw_bar_chart(data: Optional[Dict] = None) -> Dict[str, Any]:
     """Generate bar chart."""
     if not (PLOTLY_AVAILABLE and PANDAS_AVAILABLE):
         return {"success": False, "error": "Plotly/pandas not installed"}
     try:
-        data = {'Category': ['A', 'B', 'C', 'D'], 'Values': [23, 45, 56, 78]}
+        if data is None:
+            data = {'Category': ['A', 'B', 'C', 'D'], 'Values': [23, 45, 56, 78]}
         df = pd.DataFrame(data)
         fig = px.bar(df, x='Category', y='Values', title='Bar Chart', color='Category')
-        fig.update_layout(template='plotly_white')
+        fig.update_layout(
+            template='plotly_white',
+            showlegend=False,
+            xaxis_title="Categories",
+            yaxis_title="Values"
+        )
         return {"success": True, "image_data": plotly_to_base64(fig), "provider": "Plotly"}
     except Exception as e:
+        logger.error(f"Bar chart error: {e}")
         return {"success": False, "error": str(e)}
 
-def draw_pie_chart() -> dict:
+def draw_pie_chart(data: Optional[Dict] = None) -> Dict[str, Any]:
     """Generate pie chart."""
     if not (PLOTLY_AVAILABLE and PANDAS_AVAILABLE):
         return {"success": False, "error": "Plotly/pandas not installed"}
     try:
-        data = {'Category': ['X', 'Y', 'Z'], 'Values': [30, 50, 20]}
+        if data is None:
+            data = {'Category': ['X', 'Y', 'Z'], 'Values': [30, 50, 20]}
         df = pd.DataFrame(data)
         fig = px.pie(df, values='Values', names='Category', title='Pie Chart')
         fig.update_layout(template='plotly_white')
         return {"success": True, "image_data": plotly_to_base64(fig), "provider": "Plotly"}
     except Exception as e:
+        logger.error(f"Pie chart error: {e}")
         return {"success": False, "error": str(e)}
 
-def draw_line_chart() -> dict:
+def draw_line_chart(data: Optional[Dict] = None) -> Dict[str, Any]:
     """Generate line chart."""
     if not (PLOTLY_AVAILABLE and PANDAS_AVAILABLE):
         return {"success": False, "error": "Plotly/pandas not installed"}
     try:
-        data = {'Year': [2019, 2020, 2021, 2022, 2023], 'Sales': [150, 230, 180, 275, 340]}
+        if data is None:
+            data = {'Year': [2019, 2020, 2021, 2022, 2023], 'Sales': [150, 230, 180, 275, 340]}
         df = pd.DataFrame(data)
         fig = px.line(df, x='Year', y='Sales', title='Line Chart', markers=True)
-        fig.update_layout(template='plotly_white')
+        fig.update_layout(
+            template='plotly_white',
+            xaxis_title="Year",
+            yaxis_title="Sales"
+        )
         return {"success": True, "image_data": plotly_to_base64(fig), "provider": "Plotly"}
     except Exception as e:
+        logger.error(f"Line chart error: {e}")
         return {"success": False, "error": str(e)}
 
 # ==========================================================
 # MATPLOTLIB RENDERERS (PHYSICS & MATH)
 # ==========================================================
-def draw_speed_time_graph() -> dict:
+def draw_speed_time_graph() -> Dict[str, Any]:
     """Generate speed-time graph."""
-    if not (MATPLOTLIB_AVAILABLE):
+    if not MATPLOTLIB_AVAILABLE:
         return {"success": False, "error": "matplotlib not installed"}
     try:
         fig, ax = plt.subplots(figsize=(10, 6))
@@ -215,11 +271,12 @@ def draw_speed_time_graph() -> dict:
         ax.grid(True, alpha=0.3)
         return {"success": True, "image_data": fig_to_base64(fig), "provider": "Matplotlib"}
     except Exception as e:
+        logger.error(f"Speed-time graph error: {e}")
         return {"success": False, "error": str(e)}
 
-def draw_force_diagram() -> dict:
+def draw_force_diagram() -> Dict[str, Any]:
     """Generate free body diagram."""
-    if not (MATPLOTLIB_AVAILABLE):
+    if not MATPLOTLIB_AVAILABLE:
         return {"success": False, "error": "matplotlib not installed"}
     try:
         fig, ax = plt.subplots(figsize=(8, 8))
@@ -246,14 +303,15 @@ def draw_force_diagram() -> dict:
         ax.set_title('Free Body Diagram', fontsize=18, fontweight='bold', pad=25)
         return {"success": True, "image_data": fig_to_base64(fig), "provider": "Matplotlib"}
     except Exception as e:
+        logger.error(f"Force diagram error: {e}")
         return {"success": False, "error": str(e)}
 
 # ==========================================================
 # GRAPHVIZ RENDERERS (STRUCTURAL DIAGRAMS)
 # ==========================================================
-def draw_flowchart() -> dict:
+def draw_flowchart() -> Dict[str, Any]:
     """Generate flowchart diagram."""
-    if not (GRAPHVIZ_AVAILABLE):
+    if not GRAPHVIZ_AVAILABLE:
         return {"success": False, "error": "graphviz not installed"}
     try:
         dot = graphviz.Digraph(comment='Process Flow', format='png')
@@ -273,11 +331,12 @@ def draw_flowchart() -> dict:
         img_bytes = dot.pipe()
         return {"success": True, "image_data": base64.b64encode(img_bytes).decode('utf-8'), "provider": "Graphviz"}
     except Exception as e:
+        logger.error(f"Flowchart error: {e}")
         return {"success": False, "error": str(e)}
 
-def draw_org_chart() -> dict:
+def draw_org_chart() -> Dict[str, Any]:
     """Generate organizational chart."""
-    if not (GRAPHVIZ_AVAILABLE):
+    if not GRAPHVIZ_AVAILABLE:
         return {"success": False, "error": "graphviz not installed"}
     try:
         dot = graphviz.Digraph(comment='Org Chart', format='png')
@@ -296,12 +355,13 @@ def draw_org_chart() -> dict:
         img_bytes = dot.pipe()
         return {"success": True, "image_data": base64.b64encode(img_bytes).decode('utf-8'), "provider": "Graphviz"}
     except Exception as e:
+        logger.error(f"Org chart error: {e}")
         return {"success": False, "error": str(e)}
 
 # ==========================================================
 # 🚀 PROFESSIONAL HUGGING FACE GENERATOR (Multi-Model)
 # ==========================================================
-async def generate_with_hf(prompt: str, model_index: int = 0) -> dict:
+async def generate_with_hf(prompt: str, model_index: int = 0) -> Dict[str, Any]:
     """
     Generate an image using multiple Hugging Face models.
     Automatically handles queue waiting and fallback models.
@@ -312,57 +372,84 @@ async def generate_with_hf(prompt: str, model_index: int = 0) -> dict:
     - black-forest-labs/FLUX.1-schnell (Fast Fallback)
     """
     if not HF_TOKEN:
+        logger.error("HF_TOKEN not set in .env")
         return {"success": False, "error": "HF_TOKEN not set in .env"}
 
-    MODELS = [
+    MODELS = (
         "black-forest-labs/FLUX.1-dev",
         "stabilityai/stable-diffusion-3.5-large",
         "black-forest-labs/FLUX.1-schnell"
-    ]
+    )
     
     API_BASE = "https://api-inference.huggingface.co/models"
+    
+    # Enhanced prompt for better results
+    enhanced_prompt = f"Professional educational infographic diagram: {prompt}. Clean white background, sharp English labels, textbook quality."
 
-    for i in range(model_index, len(MODELS)):
-        model_id = MODELS[i]
-        url = f"{API_BASE}/{model_id}"
-        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-        enhanced_prompt = f"Professional educational infographic diagram: {prompt}. Clean white background, sharp English labels, textbook quality."
-        payload = {"inputs": enhanced_prompt}
+    # ✅ Use a session for better performance and retry handling
+    session = requests.Session()
+    session.headers.update({
+        "Authorization": f"Bearer {HF_TOKEN}",
+        "Content-Type": "application/json"
+    })
 
-        try:
-            print(f"🖼️ Generating image with {model_id}...")
-            import asyncio
-            response = requests.post(url, headers=headers, json=payload, timeout=90)
+    try:
+        attempted_models = []
+        for i in range(model_index, len(MODELS)):
+            model_id = MODELS[i]
+            url = f"{API_BASE}/{model_id}"
+            payload = {"inputs": enhanced_prompt}
 
-            # Handle Hugging Face "Model is loading" queue (503)
-            if response.status_code == 503:
-                print(f"⏳ {model_id} is loading. Waiting 5 seconds...")
-                await asyncio.sleep(5)
-                response = requests.post(url, headers=headers, json=payload, timeout=90)
+            try:
+                logger.info(f"🖼️ Generating image with {model_id}...")
+                response = await asyncio.to_thread(session.post, url, json=payload, timeout=90)
 
-            if response.status_code == 200:
-                image_base64 = base64.b64encode(response.content).decode('utf-8')
-                
-                # Validate image size
-                if len(image_base64) > MIN_IMAGE_SIZE:
-                    return {
-                        "success": True,
-                        "image_data": image_base64,
-                        "provider": f"Hugging Face ({model_id})"
-                    }
+                # Handle Hugging Face "Model is loading" queue (503)
+                if response.status_code == 503:
+                    wait_time = int(response.headers.get("X-Wait-Time", 5))
+                    logger.info(f"⏳ {model_id} is loading. Waiting {wait_time} seconds...")
+                    await asyncio.sleep(wait_time)
+                    response = await asyncio.to_thread(session.post, url, json=payload, timeout=90)
+
+                if response.status_code == 200:
+                    # Check content type
+                    content_type = response.headers.get("Content-Type", "")
+                    if "application/json" in content_type:
+                        error_data = response.json()
+                        if "error" in error_data:
+                            logger.warning(f"{model_id} returned error: {error_data['error']}")
+                            continue
+
+                    image_base64 = base64.b64encode(response.content).decode('utf-8')
+                    
+                    # Validate image size
+                    if len(image_base64) > MIN_IMAGE_SIZE:
+                        logger.info(f"✅ Image generated with {model_id}")
+                        return {
+                            "success": True,
+                            "image_data": image_base64,
+                            "provider": f"Hugging Face ({model_id})"
+                        }
+                    else:
+                        logger.warning(f"⚠️ {model_id} returned an image that was too small. Trying next model...")
                 else:
-                    print(f"⚠️ {model_id} returned an image that was too small. Trying next model...")
-            else:
-                print(f"⚠️ {model_id} returned status {response.status_code}. Trying next model...")
+                    logger.warning(f"⚠️ {model_id} returned status {response.status_code}. Trying next model...")
 
-        except requests.exceptions.Timeout:
-            print(f"⏱️ {model_id} timed out. Trying next model...")
-        except Exception as e:
-            print(f"❌ Error with {model_id}: {e}. Trying next model...")
+            except requests.exceptions.Timeout:
+                logger.warning(f"⏱️ {model_id} timed out. Trying next model...")
+            except requests.exceptions.RequestException as e:
+                logger.error(f"❌ Request error with {model_id}: {e}. Trying next model...")
+            except Exception as e:
+                logger.error(f"❌ Unexpected error with {model_id}: {e}. Trying next model...")
+            finally:
+                attempted_models.append(model_id)
 
-    return {"success": False, "error": "All Hugging Face models failed. Please try a simpler prompt."}
+        logger.error("All Hugging Face models failed")
+        return {"success": False, "error": "All Hugging Face models failed. Please try a simpler prompt.", "attempted_models": attempted_models}
+    finally:
+        session.close()
 
-async def generate_with_flux(prompt: str) -> dict:
+async def generate_with_flux(prompt: str) -> Dict[str, Any]:
     """Legacy wrapper for backward compatibility."""
     return await generate_with_hf(prompt, model_index=0)
 
@@ -370,16 +457,16 @@ async def generate_with_flux(prompt: str) -> dict:
 # DIAGRAM DETECTION
 # ==========================================================
 DIAGRAM_KEYWORDS = [
-    ("speed-time", ["speed-time", "speed time", "velocity"]),
-    ("force-diagram", ["force diagram", "free body"]),
-    ("flowchart", ["flowchart", "flow chart"]),
-    ("bar-chart", ["bar chart", "bar graph"]),
-    ("pie-chart", ["pie chart"]),
-    ("line-chart", ["line chart", "line graph"]),
-    ("org-chart", ["organizational", "org chart"]),
+    ("speed-time", ["speed-time", "speed time", "velocity", "acceleration"]),
+    ("force-diagram", ["force diagram", "free body", "forces", "fbd"]),
+    ("flowchart", ["flowchart", "flow chart", "process flow", "algorithm"]),
+    ("bar-chart", ["bar chart", "bar graph", "column chart"]),
+    ("pie-chart", ["pie chart", "pie graph", "circle chart"]),
+    ("line-chart", ["line chart", "line graph", "trend", "time series"]),
+    ("org-chart", ["organizational", "org chart", "organization", "hierarchy"]),
 ]
 
-def detect_diagram_types(answer_text: str) -> List[tuple]:
+def detect_diagram_types(answer_text: str) -> List[Tuple[str, str]]:
     """Detect diagram types mentioned in text."""
     detected = []
     lower = answer_text.lower()
@@ -389,57 +476,194 @@ def detect_diagram_types(answer_text: str) -> List[tuple]:
     return detected[:3]  # Max 3 diagrams
 
 # ==========================================================
-# MAIN GENERATOR (UPDATED WITH PROFESSIONAL HF)
+# MAIN GENERATOR
 # ==========================================================
-async def generate_diagram_image(diagram_type: str) -> dict:
-    """Generate a diagram image based on type."""
-    
-    # 🚀 1. Try Real Internet Image first
-    try:
-        result = await search_real_image(f"{diagram_type.replace('-', ' ')}")
-        if result.get("success"):
-            return result
-    except Exception:
-        pass # If Google fails, silently fallback
-
-    # 2. Plotly charts
+async def generate_diagram_image(diagram_type: str, custom_prompt: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Generate a diagram image based on type.
+    Order: local Plotly/Matplotlib/Graphviz → optional Google (only if enabled) → HF → ASCII.
+    Google is OFF by default because CSE often returns unrelated stock images.
+    """
+    # 1. Local educational renderers (deterministic, relevant to type)
     if diagram_type == "bar-chart":
         return draw_bar_chart()
     if diagram_type == "pie-chart":
         return draw_pie_chart()
     if diagram_type == "line-chart":
         return draw_line_chart()
-
-    # 3. Matplotlib physics
     if diagram_type == "speed-time":
         return draw_speed_time_graph()
     if diagram_type == "force-diagram":
         return draw_force_diagram()
-
-    # 4. Graphviz structural
     if diagram_type == "flowchart":
         return draw_flowchart()
     if diagram_type == "org-chart":
         return draw_org_chart()
 
-    # 5. HF Multi-Model AI fallback (FLUX, SD3.5, FLUX Schnell)
-    prompt = f"Professional educational diagram of {diagram_type.replace('-', ' ')}. Clean white background, English labels."
-    result = await generate_with_hf(prompt, model_index=0)
-    if result.get("success"):
-        return result
+    # 2. Optional Google image search (often unrelated — opt-in only)
+    use_google = os.getenv("DIAGRAM_USE_GOOGLE", "false").lower() in ("1", "true", "yes")
+    if use_google and GOOGLE_API_KEY and GOOGLE_ENGINE_ID:
+        try:
+            # Build a tighter educational query
+            base = custom_prompt or diagram_type.replace("-", " ")
+            search_query = f"{base} educational diagram textbook labeled"
+            result = await search_real_image(search_query)
+            if result.get("success"):
+                return result
+        except Exception as e:
+            logger.warning(f"Google search fallback error: {e}")
 
-    return {"success": False, "error": "All providers failed"}
+    # 3. HF AI image (prompt-specific when possible)
+    prompt = custom_prompt or (
+        f"Professional educational textbook diagram: {diagram_type.replace('-', ' ')}. "
+        f"Clean white background, clear English labels only, no watermark, high contrast."
+    )
+    try:
+        result = await generate_with_hf(prompt, model_index=0)
+        if result.get("success"):
+            return result
+    except Exception as e:
+        logger.warning(f"HF diagram failed: {e}")
 
-async def generate_all_diagrams(answer_text: str, subject: str = "general") -> List[dict]:
-    """Generate all detected diagrams from answer text."""
-    diagram_types = detect_diagram_types(answer_text)
-    if not diagram_types:
+    # 4. ASCII fallback
+    return await generate_ascii_art(diagram_type)
+
+async def generate_ascii_art(diagram_type: str) -> Dict[str, Any]:
+    """Generate ASCII art as a fallback when all other methods fail."""
+    ascii_art = {
+        "flowchart": """
+        +---------+     +---------+
+        |  Start  | --> | Step 1  |
+        +---------+     +---------+
+                            |
+                            v
+                    +-----------+
+                    | Decision  |
+                    +-----------+
+                    /          \\
+                   Yes         No
+                  /            \\
+                 v              v
+            +---------+    +---------+
+            | Step 2  |    |   End   |
+            +---------+    +---------+
+        """,
+        "org-chart": """
+                  CEO
+                 /  \\
+               CTO    CFO
+              /  \\     \\
+            Dev   Ops  Acc
+        """,
+        "speed-time": """
+        Speed
+          ^
+        60 |      _____
+           |     /     \\
+        30 |    /       \\
+           |   /         \\
+         0 |__/___________\\__> Time
+             200   500   600
+        """,
+    }
+    
+    art = ascii_art.get(diagram_type, f"Diagram: {diagram_type}")
+    return {
+        "success": True,
+        "image_data": base64.b64encode(art.encode('utf-8')).decode('utf-8'),
+        "provider": "ASCII Art",
+        "is_text": True
+    }
+
+def user_wants_diagram(user_message: str) -> bool:
+    """Only auto-draw when the user explicitly asks for a visual."""
+    if not user_message:
+        return False
+    m = user_message.lower()
+    keys = (
+        "draw", "diagram", "chart", "graph", "plot", "illustrate",
+        "show me a figure", "generate image", "generate a diagram",
+        "make a flowchart", "org chart", "pie chart", "bar chart",
+        "speed-time", "free body", "force diagram",
+    )
+    return any(k in m for k in keys)
+
+
+async def generate_all_diagrams(
+    answer_text: str,
+    subject: str = "general",
+    user_message: str = "",
+) -> List[Dict[str, Any]]:
+    """
+    Generate diagrams only when the user asked for one (or DIAGRAM_ALWAYS=true).
+    Avoids sticking unrelated stock/generic images onto every physics answer.
+    """
+    always = os.getenv("DIAGRAM_ALWAYS", "false").lower() in ("1", "true", "yes")
+    if not always and not user_wants_diagram(user_message):
+        logger.info("Skipping diagrams — user did not request a figure")
         return []
 
+    # Prefer detecting from the user request; fall back to answer text
+    source = user_message if user_wants_diagram(user_message) else answer_text
+    diagram_types = detect_diagram_types(source) or detect_diagram_types(answer_text)
+    if not diagram_types:
+        logger.info("No diagram types detected")
+        return []
+
+    # Build a context-aware prompt snippet (first line of user intent)
+    intent = (user_message or answer_text or "")[:200]
     images = []
-    for diagram_type, keyword in diagram_types:
-        result = await generate_diagram_image(diagram_type)
+    for diagram_type, keyword in diagram_types[:2]:  # max 2
+        logger.info(f"Generating {diagram_type} diagram")
+        custom = f"{subject} {keyword}: {intent}".strip()
+        result = await generate_diagram_image(diagram_type, custom_prompt=custom)
         if result.get("success"):
             result["keyword"] = keyword
+            result["diagram_type"] = diagram_type
             images.append(result)
+            logger.info(f"✅ {diagram_type} generated successfully")
+        else:
+            logger.warning(f"Failed to generate {diagram_type}: {result.get('error')}")
     return images
+
+# ==========================================================
+# UTILITY FUNCTIONS
+# ==========================================================
+def generate_chart(data: Dict, chart_type: str = "bar") -> Dict[str, Any]:
+    """Generate a chart from data."""
+    if chart_type == "bar":
+        return draw_bar_chart(data)
+    elif chart_type == "pie":
+        return draw_pie_chart(data)
+    elif chart_type == "line":
+        return draw_line_chart(data)
+    else:
+        return {"success": False, "error": f"Unsupported chart type: {chart_type}"}
+
+def generate_diagram(diagram_type: str, custom_prompt: Optional[str] = None) -> Dict[str, Any]:
+    """Sync wrapper for generate_diagram_image."""
+    import asyncio
+    return asyncio.run(generate_diagram_image(diagram_type, custom_prompt))
+
+# ==========================================================
+# EXPORTS
+# ==========================================================
+__all__ = [
+    "generate_all_diagrams",
+    "generate_diagram_image",
+    "generate_diagram",
+    "generate_chart",
+    "detect_diagram_types",
+    "draw_bar_chart",
+    "draw_pie_chart",
+    "draw_line_chart",
+    "draw_speed_time_graph",
+    "draw_force_diagram",
+    "draw_flowchart",
+    "draw_org_chart",
+    "generate_with_hf",
+    "generate_with_flux",
+    "search_real_image",
+]
+
+logger.info("👁️ Vision AI Image & Diagram Generation v2.0 - Ready")

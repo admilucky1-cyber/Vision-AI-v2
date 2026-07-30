@@ -1,87 +1,152 @@
 """
-Vision AI v2.0 - Upload/YouTube Router
-======================================
-YouTube video format fetching and download functionality.
-Uses yt-dlp for extraction with proper error handling.
+Vision AI v2.0 - Upload / YouTube / Media Download Router
+==========================================================
+Format listing, multi-format download (video + audio), transcript,
+size estimation, download history, secure file serving.
 """
+
+from __future__ import annotations
 
 import json
 import time
-import re  # 🔥 Added for URL validation
+import re
 import logging
 import subprocess
+import asyncio
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
-from fastapi import APIRouter, Request, HTTPException, status, Query
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from fastapi import APIRouter, Request, HTTPException, status, Query, Depends
+from fastapi.responses import JSONResponse, FileResponse
+from pydantic import BaseModel, Field, field_validator
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from services.youtube import (
+    get_video_info,
+    get_video_transcript,
+    get_video_transcript_detailed,
+    download_video,
+    estimate_download_size,
+    get_download_history,
+    extract_video_id,
+    VIDEO_FORMATS,
+    AUDIO_FORMATS,
+    QUALITY_HEIGHT,
+)
+
 router = APIRouter(prefix="/upload", tags=["YouTube"])
 limiter = Limiter(key_func=get_remote_address)
-logger = logging.getLogger("vision-ai")  # 🔥 Added logging
+logger = logging.getLogger("vision-ai.upload")
+
+DOWNLOAD_DIR = Path(__file__).resolve().parent.parent / "downloads"
+DOWNLOAD_DIR.mkdir(exist_ok=True, parents=True)
+
+MAX_DOWNLOAD_TIMEOUT = 600
+MAX_FORMAT_TIMEOUT = 45
+
 
 # ==========================================================
-# CONFIGURATION (Fixed: No circular import from main)
-# ==========================================================
-DOWNLOAD_DIR = Path("downloads")
-DOWNLOAD_DIR.mkdir(exist_ok=True)
-
-MAX_DOWNLOAD_TIMEOUT = 300  # 5 minutes
-MAX_FORMAT_TIMEOUT = 45     # 45 seconds
-
-# ==========================================================
-# REQUEST/RESPONSE MODELS
+# MODELS
 # ==========================================================
 class FormatResponse(BaseModel):
     status: str
     title: str
-    combined_formats: list
-    video_formats: list
-    audio_formats: list
+    duration: int = 0
+    thumbnail: str = ""
+    combined_formats: List[dict]
+    video_formats: List[dict]
+    audio_formats: List[dict]
+    supported_video_exts: List[str] = list(VIDEO_FORMATS.keys())
+    supported_audio_exts: List[str] = list(AUDIO_FORMATS.keys())
+    quality_presets: List[str] = list(QUALITY_HEIGHT.keys())
+
 
 class DownloadResponse(BaseModel):
     status: str
-    filename: str
-    file_size_mb: float
-    download_url: str
+    filename: str = ""
+    file_size_mb: float = 0.0
+    download_url: str = ""
+    video_id: str = ""
+    quality: str = ""
+    audio_only: bool = False
+    error: Optional[str] = None
+
+
+class VideoInfoResponse(BaseModel):
+    status: str
+    title: str
+    duration: int
+    uploader: str
+    upload_date: str
+    view_count: int
+    thumbnail: str
+    description: str
+    transcript: Optional[str] = None
+    transcript_language: Optional[str] = None
+    transcript_generated: Optional[bool] = None
+    has_transcript: bool = False
+
+
+class DownloadRequest(BaseModel):
+    url: str
+    quality: str = Field(default="medium", description="best|high|medium|low|360p|480p|720p|1080p")
+    height: Optional[int] = None
+    audio_only: bool = False
+    video_format: str = Field(default="mp4", description="mp4|mkv|webm|avi")
+    audio_format: str = Field(default="mp3", description="mp3|m4a|aac|wav|flac|ogg")
+    audio_bitrate: Optional[str] = Field(default=None, description="e.g. 128K, 192K, 320K")
+    format_id: Optional[str] = None
+
 
 # ==========================================================
-# YT-DLP HELPERS
+# HELPERS
 # ==========================================================
-def run_ytdlp(args: list, timeout: int) -> subprocess.CompletedProcess:
-    """Run yt-dlp with given arguments and timeout."""
-    cmd = ["yt-dlp"] + args
-    return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+async def run_ytdlp(args: List[str], timeout: int) -> subprocess.CompletedProcess:
+    try:
+        return await asyncio.to_thread(
+            subprocess.run,
+            ["yt-dlp"] + args,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+        )
+    except subprocess.TimeoutExpired:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Operation timed out",
+        )
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="yt-dlp is not installed. Please install it first.",
+        )
 
-def parse_formats(info: dict) -> dict:
-    """Parse yt-dlp format info into categorized lists."""
-    combined_formats = []
-    video_formats = []
-    audio_formats = []
+
+def parse_formats(info: Dict[str, Any]) -> Dict[str, List[dict]]:
+    combined_formats: List[dict] = []
+    video_formats: List[dict] = []
+    audio_formats: List[dict] = []
 
     for fmt in info.get("formats", []):
         if not fmt.get("format_id"):
             continue
-
         entry = {
             "format_id": fmt["format_id"],
             "ext": fmt.get("ext", "unknown"),
             "filesize": fmt.get("filesize") or fmt.get("filesize_approx", 0),
-            "height": fmt.get("height", 0),
-            "abr": fmt.get("abr", 0),
-            "vcodec": fmt.get("vcodec", "none"),
-            "acodec": fmt.get("acodec", "none"),
-            "quality": fmt.get("format_note", "N/A"),
-            "fps": fmt.get("fps", 0),
+            "filesize_mb": round((fmt.get("filesize") or fmt.get("filesize_approx") or 0) / (1024 * 1024), 2),
+            "height": fmt.get("height") or 0,
+            "width": fmt.get("width") or 0,
+            "abr": fmt.get("abr") or 0,
+            "vcodec": fmt.get("vcodec") or "none",
+            "acodec": fmt.get("acodec") or "none",
+            "quality": fmt.get("format_note") or "N/A",
+            "fps": fmt.get("fps") or 0,
+            "tbr": fmt.get("tbr") or 0,
         }
-
-        # Categorize format
         has_video = entry["height"] > 0 and entry["vcodec"] != "none"
-        has_audio = entry["acodec"] != "none" and entry["abr"] > 0
-
+        has_audio = entry["acodec"] != "none"
         if has_video and has_audio:
             combined_formats.append(entry)
         elif has_video:
@@ -89,141 +154,377 @@ def parse_formats(info: dict) -> dict:
         elif has_audio:
             audio_formats.append(entry)
 
-    # Sort by quality
     combined_formats.sort(key=lambda x: (x["height"], x["abr"]), reverse=True)
-    video_formats.sort(key=lambda x: x["height"], reverse=True)
-    audio_formats.sort(key=lambda x: x["abr"], reverse=True)
-
+    video_formats.sort(key=lambda x: (x["height"], x["fps"]), reverse=True)
+    audio_formats.sort(key=lambda x: x["abr"] or 0, reverse=True)
     return {
         "combined_formats": combined_formats,
         "video_formats": video_formats,
         "audio_formats": audio_formats,
     }
 
-# 🔥 Added YouTube URL validator
+
 def is_valid_youtube_url(url: str) -> bool:
     patterns = [
-        r"(https?://)?(www\.)?youtube\.com/watch\?v=[a-zA-Z0-9_-]+",
-        r"(https?://)?(www\.)?youtu\.be/[a-zA-Z0-9_-]+",
+        r"^(https?://)?(www\.|m\.)?youtube\.com/watch\?.*v=[a-zA-Z0-9_-]{11}",
+        r"^(https?://)?(www\.)?youtu\.be/[a-zA-Z0-9_-]{11}",
+        r"^(https?://)?(www\.)?youtube\.com/embed/[a-zA-Z0-9_-]{11}",
+        r"^(https?://)?(www\.)?youtube\.com/shorts/[a-zA-Z0-9_-]{11}",
+        r"^(https?://)?(www\.)?youtube\.com/live/[a-zA-Z0-9_-]{11}",
     ]
-    return any(re.match(p, url) for p in patterns)
+    return any(re.search(p, url) for p in patterns)
+
+
+def sanitize_filename(filename: str) -> str:
+    sanitized = re.sub(r'[<>:"/\\|?*\x00-\x1f]', "_", filename)
+    if len(sanitized) > 120:
+        name, ext = Path(sanitized).stem, Path(sanitized).suffix
+        sanitized = name[: 120 - len(ext)] + ext
+    return sanitized
+
 
 # ==========================================================
 # ROUTES
 # ==========================================================
-@router.get("/formats", response_model=FormatResponse)
-@limiter.limit("10/minute")
+@router.get("/formats")
+@limiter.limit("15/minute")
 async def get_video_formats(
-    request: Request, 
-    url: str = Query(..., description="YouTube video URL")
+    request: Request,
+    url: str = Query(..., description="YouTube video URL"),
 ):
     if not url or not url.startswith(("http://", "https://")):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid URL provided")
+        raise HTTPException(status_code=400, detail="Invalid URL. Must start with http:// or https://")
+    if not is_valid_youtube_url(url) and not extract_video_id(url):
+        raise HTTPException(status_code=400, detail="Invalid YouTube URL")
 
-    # 🔥 Added YouTube URL validation
-    if not is_valid_youtube_url(url):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid YouTube URL"
-        )
-
-    logger.info(f"Format fetch requested for: {url}")
-
+    logger.info(f"Format fetch: {url}")
     try:
         args = [
             "--no-check-certificate",
             "--no-warnings",
             "--dump-json",
+            "--no-playlist",
             "--format-sort", "res,codec:av1,ext,abr",
             "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "--add-header", "Referer:https://www.youtube.com",
-            "--extractor-args", "youtube:player_client=android",
+            "--extractor-args", "youtube:player_client=android,web",
             url,
         ]
-
-        result = run_ytdlp(args, MAX_FORMAT_TIMEOUT)
-
+        result = await run_ytdlp(args, MAX_FORMAT_TIMEOUT)
         if result.returncode != 0:
+            error_msg = (result.stderr or result.stdout or "Failed to fetch video information").strip()
+            logger.error(f"yt-dlp formats error: {error_msg[:300]}")
             return JSONResponse(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                content={"status": "error", "message": f"Failed to fetch formats: {result.stderr}"}
+                status_code=400,
+                content={"status": "error", "message": error_msg[:400]},
             )
-
         info = json.loads(result.stdout)
         formats = parse_formats(info)
-
-        return FormatResponse(
-            status="success",
-            title=info.get("title", "Untitled"),
+        return {
+            "status": "success",
+            "title": info.get("title", "Untitled"),
+            "duration": int(info.get("duration") or 0),
+            "thumbnail": info.get("thumbnail") or "",
             **formats,
-        )
-
-    except subprocess.TimeoutExpired:
-        raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="Format fetch timed out")
+            "supported_video_exts": list(VIDEO_FORMATS.keys()),
+            "supported_audio_exts": list(AUDIO_FORMATS.keys()),
+            "quality_presets": list(QUALITY_HEIGHT.keys()),
+        }
+    except HTTPException:
+        raise
     except json.JSONDecodeError:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Invalid response from video service")
+        raise HTTPException(status_code=502, detail="Invalid response from video service")
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        logger.error(f"/formats error: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
 
 @router.get("/download", response_model=DownloadResponse)
-@limiter.limit("5/minute")
-async def download_media(
-    request: Request, 
-    url: str = Query(..., description="Video URL"), 
-    format_id: str = Query(..., description="Format ID from /formats")
+@limiter.limit("8/minute")
+async def download_media_get(
+    request: Request,
+    url: str = Query(...),
+    format_id: Optional[str] = Query(None),
+    quality: str = Query("medium"),
+    height: Optional[int] = Query(None),
+    audio_only: bool = Query(False),
+    video_format: str = Query("mp4"),
+    audio_format: str = Query("mp3"),
+    audio_bitrate: Optional[str] = Query(None),
 ):
+    """GET download — convenient for simple links / chat intents."""
+    return await _do_download(
+        request,
+        url=url,
+        format_id=format_id,
+        quality=quality,
+        height=height,
+        audio_only=audio_only,
+        video_format=video_format,
+        audio_format=audio_format,
+        audio_bitrate=audio_bitrate,
+    )
+
+
+@router.post("/download", response_model=DownloadResponse)
+@limiter.limit("8/minute")
+async def download_media_post(request: Request, body: DownloadRequest):
+    """POST download with full options body."""
+    return await _do_download(
+        request,
+        url=body.url,
+        format_id=body.format_id,
+        quality=body.quality,
+        height=body.height,
+        audio_only=body.audio_only,
+        video_format=body.video_format,
+        audio_format=body.audio_format,
+        audio_bitrate=body.audio_bitrate,
+    )
+
+
+async def _do_download(
+    request: Request,
+    *,
+    url: str,
+    format_id: Optional[str],
+    quality: str,
+    height: Optional[int],
+    audio_only: bool,
+    video_format: str,
+    audio_format: str,
+    audio_bitrate: Optional[str],
+) -> DownloadResponse:
     if not url or not url.startswith(("http://", "https://")):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid URL")
-    if not format_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Format ID is required")
+        raise HTTPException(status_code=400, detail="Invalid URL")
 
-    # 🔥 Added YouTube URL validation
-    if not is_valid_youtube_url(url):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid YouTube URL"
-        )
+    video_format = (video_format or "mp4").lower()
+    audio_format = (audio_format or "mp3").lower()
+    if not audio_only and video_format not in VIDEO_FORMATS:
+        raise HTTPException(status_code=400, detail=f"Unsupported video format. Use: {list(VIDEO_FORMATS)}")
+    if audio_only and audio_format not in AUDIO_FORMATS:
+        raise HTTPException(status_code=400, detail=f"Unsupported audio format. Use: {list(AUDIO_FORMATS)}")
 
-    logger.info(f"Download requested for: {url} (format: {format_id})")
+    # Resolve height from quality preset if not explicit
+    resolved_height = height
+    if resolved_height is None:
+        resolved_height = QUALITY_HEIGHT.get((quality or "medium").lower())
+    if resolved_height is None:
+        resolved_height = 720
+
+    logger.info(
+        f"Download: url={url[:80]} quality={quality} height={resolved_height} "
+        f"audio_only={audio_only} vfmt={video_format} afmt={audio_format}"
+    )
 
     try:
-        timestamp = int(time.time())
-        temp_filename = f"media_{timestamp}.%(ext)s"
-        out_path = str(DOWNLOAD_DIR / temp_filename)
-
-        args = [
-            "--no-check-certificate",
-            "--no-warnings",
-            "-f", format_id,
-            "-o", out_path,
-            "--user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "--extractor-args", "youtube:player_client=android",
+        result = await download_video(
             url,
-        ]
-
-        result = run_ytdlp(args, MAX_DOWNLOAD_TIMEOUT)
-
-        downloaded_files = list(DOWNLOAD_DIR.glob(f"media_{timestamp}.*"))
-        if not downloaded_files:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Download failed - file not found")
-
-        file_path = downloaded_files[0]
-        file_size = file_path.stat().st_size
-        file_size_mb = round(file_size / (1024 * 1024), 2)
+            height=resolved_height,
+            audio_only=audio_only,
+            quality=quality or "medium",
+            video_format=video_format,
+            audio_format=audio_format,
+            audio_bitrate=audio_bitrate,
+            format_id=format_id,
+        )
+        if result.get("status") != "success":
+            return DownloadResponse(
+                status="error",
+                error=result.get("error", "Download failed"),
+            )
 
         base_url = str(request.base_url).rstrip("/")
-        download_url = f"{base_url}/downloads/{file_path.name}"
-
+        download_url = f"{base_url}/upload/downloads/{result['filename']}"
         return DownloadResponse(
             status="success",
-            filename=file_path.name,
-            file_size_mb=file_size_mb,
+            filename=result["filename"],
+            file_size_mb=result.get("file_size_mb", 0),
             download_url=download_url,
+            video_id=result.get("video_id", ""),
+            quality=quality or "medium",
+            audio_only=audio_only,
         )
-
-    except subprocess.TimeoutExpired:
-        raise HTTPException(status_code=status.HTTP_504_GATEWAY_TIMEOUT, detail="Download timed out")
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Download error: {str(e)}")
+        logger.error(f"Download error: {e}")
+        raise HTTPException(status_code=500, detail=f"Download error: {str(e)}")
+
+
+@router.get("/estimate")
+@limiter.limit("20/minute")
+async def estimate_size(
+    request: Request,
+    url: str = Query(...),
+    quality: str = Query("medium"),
+    height: int = Query(720),
+    audio_only: bool = Query(False),
+):
+    """Estimate download size without downloading."""
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="Invalid URL")
+    return await estimate_download_size(url, audio_only=audio_only, height=height, quality=quality)
+
+
+@router.get("/info", response_model=VideoInfoResponse)
+@limiter.limit("15/minute")
+async def get_video_info_endpoint(
+    request: Request,
+    url: str = Query(...),
+    with_timestamps: bool = Query(False),
+):
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="Invalid URL")
+
+    logger.info(f"Info fetch: {url}")
+    try:
+        info = await get_video_info(url)
+        detailed = await get_video_transcript_detailed(url, with_timestamps=with_timestamps)
+        return VideoInfoResponse(
+            status="success",
+            title=info.get("title", "Unknown"),
+            duration=info.get("duration", 0),
+            uploader=info.get("uploader", "Unknown"),
+            upload_date=info.get("upload_date", "Unknown"),
+            view_count=info.get("view_count", 0),
+            thumbnail=info.get("thumbnail", ""),
+            description=(info.get("description") or "")[:800],
+            transcript=detailed.get("text"),
+            transcript_language=detailed.get("language"),
+            transcript_generated=detailed.get("is_generated"),
+            has_transcript=bool(detailed.get("has_transcript")),
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"/info error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/transcript")
+@limiter.limit("15/minute")
+async def get_transcript_endpoint(
+    request: Request,
+    url: str = Query(...),
+    with_timestamps: bool = Query(False),
+    lang: Optional[str] = Query(None, description="Preferred language code e.g. en, ur, hi"),
+):
+    """Dedicated transcript endpoint with language preference and timestamps."""
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="Invalid URL")
+    languages = [lang] + ["en", "en-US"] if lang else None
+    detailed = await get_video_transcript_detailed(url, with_timestamps=with_timestamps, languages=languages)
+    if not detailed.get("has_transcript"):
+        return JSONResponse(
+            status_code=404,
+            content={
+                "status": "error",
+                "message": "Transcript unavailable (captions disabled, restricted, or not generated).",
+                "video_id": detailed.get("video_id"),
+            },
+        )
+    return {
+        "status": "success",
+        "video_id": detailed.get("video_id"),
+        "text": detailed.get("text"),
+        "language": detailed.get("language"),
+        "is_generated": detailed.get("is_generated"),
+        "method": detailed.get("method"),
+        "char_count": detailed.get("char_count"),
+        "with_timestamps": with_timestamps,
+    }
+
+
+@router.get("/history")
+@limiter.limit("30/minute")
+async def download_history(request: Request, limit: int = Query(30, ge=1, le=100)):
+    """Recent download history (server-side)."""
+    return {"status": "success", "items": get_download_history(limit=limit)}
+
+
+@router.get("/health")
+async def upload_health():
+    ytdlp_ok = False
+    version = None
+    try:
+        r = subprocess.run(["yt-dlp", "--version"], capture_output=True, text=True, timeout=5)
+        ytdlp_ok = r.returncode == 0
+        version = (r.stdout or "").strip()
+    except Exception:
+        pass
+    ffmpeg_ok = False
+    try:
+        from services.youtube import _ffmpeg_available
+        ffmpeg_ok = _ffmpeg_available()
+    except Exception:
+        try:
+            r = subprocess.run(["ffmpeg", "-version"], capture_output=True, timeout=5)
+            ffmpeg_ok = r.returncode == 0
+        except Exception:
+            ffmpeg_ok = False
+    return {
+        "status": "healthy",
+        "download_dir_exists": DOWNLOAD_DIR.exists(),
+        "ytdlp_available": ytdlp_ok,
+        "ytdlp_version": version,
+        "ffmpeg_available": ffmpeg_ok,
+        "supported_video": list(VIDEO_FORMATS.keys()),
+        "supported_audio": list(AUDIO_FORMATS.keys()),
+        "timestamp": time.time(),
+        "hint": None if ffmpeg_ok else "Install ffmpeg for MP3 conversion: sudo apt install -y ffmpeg",
+    }
+
+
+@router.get("/downloads/{filename}")
+async def serve_downloaded_file(filename: str):
+    """Serve downloaded files — forces browser/OS download dialog."""
+    safe_name = Path(filename).name
+    if safe_name != filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+    file_path = DOWNLOAD_DIR / safe_name
+    if not file_path.exists() or not file_path.is_file():
+        raise HTTPException(status_code=404, detail="File not found")
+    try:
+        file_path.resolve().relative_to(DOWNLOAD_DIR.resolve())
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Invalid path")
+
+    ext = file_path.suffix.lower()
+    media_map = {
+        ".mp3": "audio/mpeg",
+        ".m4a": "audio/mp4",
+        ".aac": "audio/aac",
+        ".wav": "audio/wav",
+        ".flac": "audio/flac",
+        ".ogg": "audio/ogg",
+        ".mp4": "video/mp4",
+        ".webm": "video/webm",
+        ".mkv": "video/x-matroska",
+        ".avi": "video/x-msvideo",
+    }
+    media = media_map.get(ext, "application/octet-stream")
+    # filename= triggers Content-Disposition: attachment → browser download manager
+    return FileResponse(
+        path=str(file_path),
+        filename=safe_name,
+        media_type=media,
+        headers={
+            "Content-Disposition": f'attachment; filename="{safe_name}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
+@router.delete("/cleanup")
+async def cleanup_old_files(days: int = Query(7, ge=1, le=90)):
+    cutoff = time.time() - (days * 24 * 60 * 60)
+    deleted = 0
+    for file_path in DOWNLOAD_DIR.glob("media_*"):
+        try:
+            if file_path.is_file() and file_path.stat().st_mtime < cutoff:
+                file_path.unlink()
+                deleted += 1
+        except Exception as e:
+            logger.error(f"Failed to delete {file_path}: {e}")
+    return {"message": f"Cleaned up {deleted} files older than {days} days", "deleted_count": deleted}
