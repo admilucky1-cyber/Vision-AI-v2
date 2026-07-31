@@ -84,6 +84,7 @@ async def chat_send(
     files: List[UploadFile] = File(default=[]),
     model: str = Form("auto"),
     generate_images: bool = Form(True),
+    history_hint: str = Form(""),
     current_user: dict = Depends(get_current_active_user),
 ):
     start_time = time.time()
@@ -171,29 +172,52 @@ async def chat_send(
                     logger.info(f"   ✅ Cached: {file.filename} as {tag} ({len(content)} chars)")
                 except Exception as e:
                     logger.error(f"   ❌ Failed: {file.filename} - {e}")
-                    file_texts.append(f"[File: {file.filename}] Could not process.")
+                    file_texts.append(
+                        f"[File: {file.filename}] Processing returned no usable text. "
+                        "If this is a scan, ensure tesseract is installed; for images set GOOGLE_API_KEY."
+                    )
 
             if file_texts:
                 extra_context = "\n\n".join(file_texts)
+                # Cap context so providers don't time out on 20MB PDFs
+                MAX_CONTEXT_CHARS = 120_000
+                if len(extra_context) > MAX_CONTEXT_CHARS:
+                    extra_context = (
+                        extra_context[:MAX_CONTEXT_CHARS]
+                        + "\n\n[... document truncated for length; ask about a specific page/section ...]"
+                    )
+                    logger.info(f"Truncated file context to {MAX_CONTEXT_CHARS} chars")
                 logger.info(f"📄 Document context injected. Continuing to chat...")
 
         # Re-inject previous file context if no new files uploaded
-        if not files and len(rag_cache._cache) > 0:
+        # Reuse previous upload ONLY if user clearly refers to it (avoid wrong exam answers)
+        msg_l = (message or "").lower()
+        wants_prev = any(w in msg_l for w in (
+            "previous document", "previous file", "the document", "the pdf",
+            "same paper", "same document", "us document", "yeh document",
+            "that file", "that pdf", "continue with the paper",
+        ))
+        if not files and wants_prev and len(rag_cache._cache) > 0:
             latest_file = rag_cache.get_latest()
-            if latest_file and latest_file.get("content"):
-                fn = latest_file.get("filename") or "document"
-                fn_lower = fn.lower()
-                if "_ms_" in fn_lower or "mark_scheme" in fn_lower or "markscheme" in fn_lower:
-                    tag = "MARK SCHEME / ANSWER KEY"
-                elif "_qp_" in fn_lower or "question" in fn_lower:
-                    tag = "QUESTION PAPER"
-                elif "_er_" in fn_lower or "examiner" in fn_lower:
-                    tag = "EXAMINER REPORT"
-                else:
-                    tag = "UPLOADED DOCUMENT"
-                file_texts.append(f"[{tag}: {fn}]\n{latest_file['content']}")
-                logger.info(f"♻️ Re-injecting previous file context: {fn} as {tag}")
+            if latest_file:
+                fn = latest_file.get("filename", "document")
+                file_texts.append(
+                    f"[Previously uploaded document: {fn}]\n{latest_file['content']}"
+                )
+                file_names.append(fn)
                 extra_context = "\n\n".join(file_texts)
+                # Cap context so providers don't time out on 20MB PDFs
+                MAX_CONTEXT_CHARS = 120_000
+                if len(extra_context) > MAX_CONTEXT_CHARS:
+                    extra_context = (
+                        extra_context[:MAX_CONTEXT_CHARS]
+                        + "\n\n[... document truncated for length; ask about a specific page/section ...]"
+                    )
+                    logger.info(f"Truncated file context to {MAX_CONTEXT_CHARS} chars")
+                logger.info(f"Reusing previous upload: {fn}")
+        elif not files and len(rag_cache._cache) > 0:
+            logger.info("Skipping RAG cache reuse (user did not reference previous document)")
+
 
         # 🚀 =================================================================
         # ROUTER PRIORITY 2: YOUTUBE URL DETECTION
@@ -212,33 +236,29 @@ async def chat_send(
 
             # Download intent: download/save/grab/dl OR media quality keywords with URL
             wants_download = bool(re.search(
-                r"\b(download|save|grab|fetch|dl)\b",
+                r"\b(download|downloaad|downlod|downlaod|save|grab|fetch|dl)\b",
                 msg_l,
             )) or bool(re.search(
                 r"\b(mp3|mp4|m4a|mkv|webm|flac|wav|1080p?|720p?|480p?|360p?|4k)\b|\.mp4|\.mp3",
                 msg_l,
             ))
 
-            if wants_download:
-                try:
-                    from services.youtube import download_video, get_direct_media_urls
-                except ImportError:
-                    from services.youtube import download_video
-                    get_direct_media_urls = None
 
+            if wants_download:
+                # Prefer DIRECT CDN links (browser / IDM / FDM). Server storage only if asked.
+                force_server = any(
+                    p in msg_l
+                    for p in (
+                        "server download", "save on server", "permanent link",
+                        "host file", "store on server",
+                    )
+                )
                 height = 720
-                quality = "medium"
                 hm = re.search(r"\b(360|480|540|720|1080|1440|2160)p?\b", msg_l)
                 if hm:
                     height = int(hm.group(1))
-                    quality = f"{height}p"
                 elif "best" in msg_l or "highest" in msg_l or "4k" in msg_l:
-                    height = 2160
-                    quality = "best"
-                elif "low" in msg_l:
-                    height = 360
-                    quality = "low"
-
+                    height = 1080
                 audio_only = any(
                     k in msg_l
                     for k in (
@@ -248,135 +268,137 @@ async def chat_send(
                         "only audio", "extract audio",
                     )
                 )
-                audio_format = "mp3"
-                for af in ("flac", "wav", "ogg", "aac", "m4a", "mp3"):
-                    if af in msg_l:
-                        audio_format = af
-                        break
-                video_format = "mp4"
-                for vf in ("mkv", "webm", "avi", "mp4"):
-                    if re.search(rf"\b{vf}\b", msg_l):
-                        video_format = vf
-                        break
-                audio_bitrate = None
-                bm = re.search(r"\b(64|96|128|160|192|256|320)\s*k(?:bps)?\b", msg_l)
-                if bm:
-                    audio_bitrate = int(bm.group(1))
 
-                logger.info(
-                    f"⬇️ Download intent: height={height} quality={quality} "
-                    f"audio_only={audio_only} vfmt={video_format} afmt={audio_format} abr={audio_bitrate}"
-                )
-
-                force_server = any(
-                    p in msg_l
-                    for p in ("server download", "save on server", "permanent link", "host file")
-                )
-                # MP3 needs ffmpeg convert on server
-                if audio_only and audio_format == "mp3" and "direct" not in msg_l:
-                    force_server = True
-                # High-res video: server merge is more reliable than progressive CDN links
-                if (not audio_only) and height and int(height) >= 1080 and "direct" not in msg_l:
-                    force_server = True
                 answer = None
-                result = {"status": "error", "error": "unknown"}
+                if not force_server:
+                    try:
+                        from services.youtube import list_direct_download_options
+                    except ImportError:
+                        list_direct_download_options = None
+                    if list_direct_download_options:
+                        try:
+                            opts = await list_direct_download_options(youtube_url)
+                        except Exception as e:
+                            logger.warning(f"list_direct failed: {e}")
+                            opts = {"status": "error", "error": str(e)}
+                        if opts.get("status") == "success":
+                            title = opts.get("title") or "Video"
+                            videos = opts.get("video") or []
+                            audios = opts.get("audio") or []
 
-                try:
-                    if not force_server and get_direct_media_urls is not None:
-                        direct = await get_direct_media_urls(
-                            youtube_url,
-                            height=height or 1080,
-                            audio_only=audio_only,
-                            quality=quality or "best",
-                            audio_bitrate=audio_bitrate,
-                        )
-                        if direct.get("status") == "success" and direct.get("primary_url"):
-                            size_line = (
-                                f"- **Est. size:** ~{direct['size_mb']} MB\n"
-                                if direct.get("size_mb") else ""
-                            )
-                            title_line = (
-                                f"- **Title:** {direct['title']}\n"
-                                if direct.get("title") else ""
-                            )
+                            def _row(label, size_mb, url, badge=""):
+                                size = f" · ~{size_mb} MB" if size_mb else ""
+                                b = f" `{badge}`" if badge else ""
+                                return f"1. [**{label}**{size}]({url}){b}"
+
+                            lines = [
+                                f"### ⬇️ {title}",
+                                "",
+                                "Pick a quality → **click** (browser) or **right-click → IDM/FDM**.",
+                                "Nothing stored on this server. Links expire in a few hours.",
+                                "",
+                            ]
                             if audio_only:
-                                btn = f"[⬇️ Start download audio]({direct['primary_url']})"
-                                kind = f"audio ({direct.get('ext', 'm4a').upper()}"
-                                if audio_bitrate:
-                                    kind += f", ≤{audio_bitrate}k"
-                                kind += ")"
+                                if audios:
+                                    lines.append("**Audio**")
+                                    for a in audios:
+                                        lines.append(_row(a["label"], a.get("size_mb"), a["url"], "audio"))
+                                    lines.append("")
+                                if videos:
+                                    lines.append("**Video** (optional)")
+                                    for v in videos[:6]:
+                                        badge = "ready" if v.get("has_audio") else "video-only"
+                                        lines.append(_row(v["label"], v.get("size_mb"), v["url"], badge))
                             else:
-                                kind = (
-                                    f"video (requested ≤{height}p, got "
-                                    f"{direct.get('resolution') or 'n/a'}, "
-                                    f"{direct.get('ext', 'mp4').upper()})"
-                                )
-                                if direct.get("audio_url"):
-                                    btn = (
-                                        f"- [⬇️ Start download video]({direct['primary_url']})\n"
-                                        f"- [⬇️ Start download audio track]({direct['audio_url']})"
-                                    )
-                                else:
-                                    btn = f"[⬇️ Start download video]({direct['primary_url']})"
-                            # Quality gate: if user asked ≥720p but stream is much lower, use server merge
-                            got_h = direct.get("height")
-                            if not audio_only and height and got_h and int(got_h) < int(height) * 0.7:
-                                logger.warning(
-                                    f"Direct stream {got_h}p << requested {height}p — falling back to server download"
-                                )
-                                answer = None  # trigger server path below
+                                if videos:
+                                    lines.append("**Video**")
+                                    for v in videos:
+                                        badge = "ready" if v.get("has_audio") else "video-only"
+                                        lines.append(_row(v["label"], v.get("size_mb"), v["url"], badge))
+                                    lines.append("")
+                                if audios:
+                                    lines.append("**Audio**")
+                                    for a in audios:
+                                        lines.append(_row(a["label"], a.get("size_mb"), a["url"], "audio"))
+                            if not videos and not audios:
+                                lines.append("_No direct progressive streams found._")
+                                lines.append("Try: `server download 720p <url>`")
                             else:
-                                answer = (
-                                    f"✅ **Direct link ready** — {kind}\n\n"
-                                    f"{title_line}{size_line}"
-                                    f"{btn}\n\n"
-                                    f"⚡ Browser / IDM / FDM fetches from the CDN.\n"
-                                    f"⚠️ Links usually expire within a few hours.\n\n"
-                                    f"_Server copy: `server download mp4 {height}p <url>`_"
-                                )
-                                result = {"status": "success", "mode": "direct"}
+                                lines.extend([
+                                    "",
+                                    "**How to use**",
+                                    "- Browser: click the link",
+                                    "- IDM / FDM: right-click link → Download with…",
+                                    "- Prefer `ready` over `video-only`",
+                                    "",
+                                    "_Server copy only if needed:_ `server download 720p <url>`",
+                                ])
+                            answer = "\n".join(lines)
 
-                    if answer is None:
+                if answer is None and force_server:
+                    try:
+                        from services.youtube import download_video
                         result = await download_video(
                             youtube_url,
                             height=height,
                             audio_only=audio_only,
-                            quality=quality,
-                            video_format=video_format,
-                            audio_format=audio_format,
+                            quality=f"{height}p",
                         )
                         if result.get("status") == "success":
                             base = str(request.base_url).rstrip("/")
                             link = f"{base}/upload/downloads/{result['filename']}"
-                            kind = (
-                                f"audio ({audio_format.upper()})"
-                                if audio_only
-                                else f"video (≤{height}p, {video_format.upper()})"
-                            )
-                            note = result.get("note") or ""
-                            note_line = f"\n\nℹ️ {note}" if note else ""
                             answer = (
-                                f"✅ **Download ready** — {kind}\n\n"
+                                f"✅ **Server file ready** (temporary storage)\n\n"
                                 f"- **File:** `{result['filename']}`\n"
-                                f"- **Size:** {result['file_size_mb']} MB\n"
-                                f"- **Link:** [⬇️ Download {result['filename']}]({link})\n\n"
-                                f"Stored under `/downloads`. Older files are cleaned periodically."
-                                f"{note_line}"
+                                f"- **Size:** {result.get('file_size_mb', '?')} MB\n\n"
+                                f"[⬇️ Download]({link})\n\n"
+                                f"_Prefer no server storage? Ask without the words `server download`._"
                             )
                         else:
+                            answer = f"❌ Server download failed: {result.get('error', 'unknown')}"
+                    except Exception as e:
+                        answer = f"❌ Server download error: {e}"
+
+                if answer is None:
+                    # Auto-fallback to server temp download when direct CDN fails
+                    try:
+                        from services.youtube import download_video
+                        result = await download_video(
+                            youtube_url,
+                            height=height or 720,
+                            audio_only=audio_only,
+                            quality=f"{height or 720}p",
+                        )
+                        if result.get("status") == "success":
+                            base = str(request.base_url).rstrip("/")
+                            link = f"{base}/upload/downloads/{result['filename']}"
+                            note = result.get("note") or ""
+                            extra = f"- **Note:** {note}\n" if note else ""
                             answer = (
-                                f"❌ **Download failed**\n\n"
-                                f"{result.get('error') or 'Unknown error'}\n\n"
-                                f"**Tips:** `pip install -U yt-dlp`, set `FFMPEG_LOCATION`, "
-                                f"or place `cookies.txt` for restricted videos."
+                                f"✅ **Download ready** (server temp file)\n\n"
+                                f"- **File:** `{result['filename']}`\n"
+                                f"- **Size:** {result.get('file_size_mb', '?')} MB\n"
+                                f"{extra}\n"
+                                f"[⬇️ Download file]({link})\n\n"
+                                f"_Direct CDN blocked. Add Netscape cookies.txt + YTDLP_COOKIES for direct links._"
                             )
-                except Exception as dl_err:
-                    logger.exception("YouTube download pipeline error")
-                    answer = f"❌ **Download failed**\n\n{dl_err}"
+                        else:
+                            err = result.get("error") or "unknown"
+                            answer = (
+                                f"❌ Download failed: {err}\n\n"
+                                f"**Fix:** put Netscape `cookies.txt` in project root, set "
+                                f"`YTDLP_COOKIES=cookies.txt`, restart. "
+                                f"Railway needs Dockerfile + cookies at `/app/cookies.txt`."
+                            )
+                    except Exception as e:
+                        answer = (
+                            f"❌ Download failed: {e}\n\n"
+                            f"Need `yt-dlp`, `ffmpeg` (Docker), and optional `YTDLP_COOKIES`."
+                        )
 
                 return ChatResponse(
                     answer=answer,
-                    model_used="youtube-download",
+                    model_used="youtube-direct",
                     context_length=0,
                     response_time=round(time.time() - start_time, 2),
                     reasoning_style="download",
@@ -387,7 +409,6 @@ async def chat_send(
                     current_time=datetime.utcnow().isoformat() + "Z",
                 )
 
-            # Non-download: inject transcript for Q&A
             try:
                 from services.youtube import get_video_context
                 yt = await get_video_context(youtube_url, max_transcript_chars=25000)
@@ -425,6 +446,13 @@ async def chat_send(
         # ROUTER PRIORITY 4: WEB SEARCH (skip when documents are the focus)
         # =================================================================
         current_time_context = f"[CURRENT DATE & TIME: {get_current_info()}]"
+        if (history_hint or '').strip():
+            extra_context = (
+                "[THIS CHAT THREAD - recent turns]\n"
+                + (history_hint or '').strip()[:2000]
+                + "\n\n"
+                + extra_context
+            )
         extra_context = current_time_context + "\n" + extra_context
 
         search_performed = False
@@ -470,10 +498,10 @@ async def chat_send(
         try:
             answer = await asyncio.wait_for(
                 asyncio.to_thread(ask_ai, message, extra_context, model),
-                timeout=50.0,
+                timeout=(120.0 if files or file_texts else 55.0),
             )
         except asyncio.TimeoutError:
-            logger.error("❌ AI error: provider chain exceeded 50s budget")
+            logger.error("❌ AI error: provider chain exceeded time budget")
             answer = (
                 "I apologize, but the AI providers took too long to respond. "
                 "This can happen when a provider is degraded — please try again, "
@@ -549,5 +577,22 @@ async def chat_send(
         logger.error(f"❌ FATAL CHAT ERROR:")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+
+
+
+@router.post("/chat/clear-cache")
+async def clear_chat_caches(current_user: dict = Depends(get_current_active_user)):
+    """Clear in-memory RAG upload cache + web search cache."""
+    try:
+        rag_cache.clear()
+    except Exception as e:
+        logger.warning(f"RAG clear: {e}")
+    try:
+        from services.search import clear_search_cache
+        clear_search_cache()
+    except Exception as e:
+        logger.warning(f"Search clear: {e}")
+    return {"status": "ok", "message": "RAG and search caches cleared"}
+
 
 logger.info("👁️ Vision AI Chat Router v2.0 - Ready")

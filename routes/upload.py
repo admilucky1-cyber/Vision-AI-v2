@@ -442,6 +442,14 @@ async def download_history(request: Request, limit: int = Query(30, ge=1, le=100
     return {"status": "success", "items": get_download_history(limit=limit)}
 
 
+
+@router.get("/direct-options")
+@limiter.limit("20/minute")
+async def direct_options(request: Request, url: str = Query(..., min_length=8)):
+    """List direct CDN links for video/audio (no server storage)."""
+    from services.youtube import list_direct_download_options
+    return await list_direct_download_options(url)
+
 @router.get("/health")
 async def upload_health():
     ytdlp_ok = False

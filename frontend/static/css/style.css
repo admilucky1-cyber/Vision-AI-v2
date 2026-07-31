@@ -1924,3 +1924,50 @@ a.dl-file-link:hover {
     padding-left: 12px;
     margin: 6px 0;
 }
+
+/* Stop button */
+.stop-btn, #stopBtn {
+  background: linear-gradient(135deg, #ef4444, #b91c1c) !important;
+  margin-right: 8px;
+}
+.message-row.ai .message-bubble.msg-wide {
+  max-width: min(96%, 1100px) !important;
+  width: 96% !important;
+}
+.message-row.ai .message-bubble.msg-tall .markdown-content,
+.message-bubble.msg-expanded .markdown-content {
+  max-height: none !important;
+}
+.message-row.ai .message-bubble .markdown-content {
+  max-height: 70vh;
+  overflow: auto;
+}
+.message-row.ai .message-bubble.msg-tall .markdown-content {
+  max-height: none !important;
+}
+.sidebar-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  z-index: 90;
+}
+.sidebar-overlay.active {
+  display: block;
+}
+@media (max-width: 768px) {
+  #sidebar.open-mobile {
+    transform: translateX(0) !important;
+    z-index: 100;
+  }
+}
+body.chat-focus-mode .sidebar { display: none !important; }
+body.chat-focus-mode .chat-container { max-width: 100% !important; }
+body.chat-focus-mode .message-row.ai .message-bubble {
+  max-width: min(98%, 1200px) !important;
+}
+
+#floatingThemeToggle, #helpBtn, #adminBtn, #adminPayBtn {
+  display: none !important;
+  visibility: hidden !important;
+}

@@ -67,10 +67,12 @@ GEMINI_MODELS: Dict[str, Dict[str, Any]] = {
 }
 
 OPENROUTER_MODELS: List[Dict[str, Any]] = [
-    {"id": "meta-llama/llama-3.3-70b-instruct:free", "name": "Llama 3.3 70B", "tokens": 131_072},
-    {"id": "google/gemma-2-9b-it:free", "name": "Gemma 2 9B", "tokens": 8192},
-    {"id": "qwen/qwen-2.5-72b-instruct:free", "name": "Qwen 2.5 72B", "tokens": 131_072},
-    {"id": "microsoft/phi-3-medium-128k-instruct:free", "name": "Phi-3 Medium", "tokens": 128_000},
+    # Prefer :free models (rotate on OpenRouter; check openrouter.ai/models?q=free)
+    {"id": "openrouter/free", "name": "OpenRouter Free Router", "tokens": 128_000},
+    {"id": "meta-llama/llama-3.3-70b-instruct:free", "name": "Llama 3.3 70B (free)", "tokens": 131_072},
+    {"id": "nvidia/nemotron-3-super-120b-a12b:free", "name": "Nemotron 3 Super (free)", "tokens": 262_144},
+    {"id": "google/gemma-2-9b-it:free", "name": "Gemma 2 9B (free)", "tokens": 8192},
+    {"id": "qwen/qwen-2.5-72b-instruct:free", "name": "Qwen 2.5 72B (free)", "tokens": 131_072},
 ]
 
 # ==========================================================
@@ -111,7 +113,9 @@ When context contains [WEB SEARCH RESULTS], [REAL-TIME LIVE DATA FROM WEB],
 • Prefer the most recent and authoritative facts when they conflict.
 
 SELF-REVIEW:
-Before finalizing, check logic, factual consistency, and completeness."""
+Before finalizing, check logic, factual consistency, and completeness.
+
+When the user message context includes [IMAGE: ...], [PDF Content], OCR text, or uploaded document blocks, you MUST use that content. Never claim you cannot see or read the file if that context is present. If OCR text is partial, answer from what is available and note uncertainty.\nFor multiple-choice physics papers: reason carefully; alpha particles (not beta) are stopped by paper; check units and diagram labels. Do not invent option letters not in the paper. Never repeat a previous paper's answers when a new document is provided."""
 
 EXPERT_PROMPTS: Dict[str, str] = {
     "general": MASTER_SYSTEM_PROMPT,
@@ -440,7 +444,7 @@ def ask_deepseek(question: str, context: str = "") -> Optional[str]:
                 {"role": "user", "content": f"Context:\n{truncated}\n\nQuestion:\n{question}"},
             ],
             "temperature": 0.7,
-            "max_tokens": 4096,
+            "max_tokens": 8192,
         }
         resp = requests.post(
             "https://api.deepseek.com/v1/chat/completions",
@@ -477,7 +481,7 @@ def ask_groq(question: str, context: str = "") -> Optional[str]:
                 {"role": "user", "content": f"Context:\n{truncated}\n\nQuestion:\n{question}"},
             ],
             "temperature": 0.7,
-            "max_tokens": 4096,
+            "max_tokens": 8192,
         }
         resp = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -517,7 +521,7 @@ def ask_openrouter(question: str, context: str = "") -> Optional[str]:
                     {"role": "user", "content": f"Context:\n{truncated}\n\nQuestion:\n{question}"},
                 ],
                 "temperature": 0.7,
-                "max_tokens": 4096,
+                "max_tokens": 8192,
             }
             resp = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",

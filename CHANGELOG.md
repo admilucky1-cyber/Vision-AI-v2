@@ -103,3 +103,17 @@
 - Search: expand `pk`/`pak` → Pakistan, `pm` → Prime Minister, fix typos (primminsiter, offical)
 - Search triggers for current officials / PM queries
 - YouTube download: support `YTDLP_COOKIES` file or `YTDLP_COOKIES_FROM_BROWSER` for bot checks
+
+## [2.2.0] — 2026-07-31 — Voice + UI v3
+
+### Added
+- **Voice input** (browser Web Speech API): mic button in composer
+- **Voice output**: Speak / Stop on AI messages (`speechSynthesis`)
+- Quick hint chips: Image Q&A, Solve PDF, YouTube, Voice
+- `v3-ui.css` — glass composer, gradients, mic pulse, refined actions
+- Image attach toast guidance
+- `capture=environment` for mobile camera on file input
+
+### Notes
+- Voice needs Chrome/Edge (or Safari); HTTPS or localhost for mic permission
+- Server Whisper / paid TTS can be added later as Pro upgrades

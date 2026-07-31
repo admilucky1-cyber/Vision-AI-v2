@@ -172,7 +172,7 @@ class SearchCache:
             except Exception:
                 pass
             return
-        self.mem[k] = {"data": data, "ts": time.time(), "ttl": ttl}
+        self.mem[k] = {"data": data, "ts": time.time(), "ttl": ttl, "query": query}
         self._save()
 
     def clear(self):
@@ -190,8 +190,13 @@ class SearchCache:
             pass
 
     def get_stats(self) -> Dict[str, Any]:
+        # Keep backward-compatible keys + dashboard keys
         return {
             "entries": len(self.mem) if not USE_REDIS else "redis",
+            "total_entries": len(self.mem) if not USE_REDIS else 0,
+            "max_cache_size": MAX_CACHE_SIZE,
+            "cache_duration_seconds": CACHE_DURATION,
+            "recent_queries": [],
             "tavily": bool(tavily),
             "ddgs": _DDGS is not None,
             "engines": available_engines(),
@@ -546,7 +551,55 @@ def clear_search_cache():
 
 
 def get_search_stats() -> Dict[str, Any]:
-    return search_cache.get_stats()
+    """Shape expected by frontend/admin/search-dashboard.html."""
+    now = time.time()
+    recent = []
+    try:
+        items = []
+        for k, item in (search_cache.mem or {}).items():
+            if not isinstance(item, dict):
+                continue
+            data = item.get("data") or ""
+            ts = float(item.get("ts") or 0)
+            ttl = float(item.get("ttl") or CACHE_DURATION)
+            age = max(0, now - ts)
+            is_stale = age > ttl
+            # Try to recover original query from stored data header if present
+            query = item.get("query") or k
+            if isinstance(data, str) and data.startswith("QUERY:"):
+                query = data.split("\n", 1)[0].replace("QUERY:", "", 1).strip() or k
+            # Prefer short key display
+            display_q = query if len(str(query)) < 80 else (str(query)[:77] + "...")
+            # age human
+            if age < 60:
+                age_h = f"{int(age)}s"
+            elif age < 3600:
+                age_h = f"{int(age // 60)}m"
+            else:
+                age_h = f"{int(age // 3600)}h"
+            items.append({
+                "query": display_q,
+                "age_seconds": int(age),
+                "age_human": age_h,
+                "result_length": len(data) if isinstance(data, str) else 0,
+                "is_stale": is_stale,
+                "ts": ts,
+            })
+        items.sort(key=lambda x: x.get("ts", 0), reverse=True)
+        recent = items[:30]
+    except Exception as e:
+        logger.warning(f"search stats recent: {e}")
+
+    return {
+        "status": "ok",
+        "total_entries": len(search_cache.mem) if not USE_REDIS else 0,
+        "max_cache_size": MAX_CACHE_SIZE,
+        "cache_duration_seconds": CACHE_DURATION,
+        "recent_queries": recent,
+        "engines": available_engines(),
+        "tavily": bool(tavily),
+        "redis": bool(USE_REDIS),
+    }
 
 
 __all__ = [

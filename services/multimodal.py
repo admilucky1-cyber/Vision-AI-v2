@@ -36,11 +36,16 @@ logger = logging.getLogger("vision-ai.multimodal")
 # ==========================================================
 # CONFIGURATION
 # ==========================================================
-HF_TOKEN = os.getenv("HF_TOKEN")
-HF_API_IMAGE = "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-base"
-
-# OpenAI Whisper (paid)
+HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("HUGGINGFACE_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+# Image caption / vision endpoints (tried in order)
+HF_IMAGE_MODELS = [
+    "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-large",
+    "https://api-inference.huggingface.co/models/Salesforce/blip-image-captioning-base",
+    "https://router.huggingface.co/hf-inference/models/Salesforce/blip-image-captioning-base",
+]
 
 # Supported file extensions
 IMAGE_EXTENSIONS = {'jpg', 'jpeg', 'png', 'bmp', 'webp', 'tiff', 'tif'}
@@ -138,17 +143,21 @@ def _process_pdf(content: bytes, filename: str) -> str:
     try:
         # Step 1: Try direct text extraction
         extracted_text = _extract_text_from_pdf(tmp_path)
-        if extracted_text and len(extracted_text.strip()) > 50:
+        if extracted_text and len(extracted_text.strip()) > 20:
             logger.info(f"PDF text extracted: {filename} ({len(extracted_text)} chars)")
             return f"[PDF Content - {filename}]\n\n{extracted_text}"
 
         # Step 2: Try OCR (optional)
         ocr_text = _ocr_pdf(tmp_path, filename)
-        if ocr_text and len(ocr_text.strip()) > 50:
+        if ocr_text and len(ocr_text.strip()) > 20:
             logger.info(f"PDF OCR processed: {filename} ({len(ocr_text)} chars)")
             return f"[PDF Content (OCR) - {filename}]\n\n{ocr_text}"
 
-        return _format_pdf_error(filename)
+        return (
+            f"[PDF: {filename}] Could not extract text. "
+            "Likely a scanned PDF. Install tesseract-ocr + poppler-utils, or paste questions as text. "
+            "On Docker this is included; on Windows install Tesseract and set PATH."
+        )
     finally:
         _cleanup_temp_file(tmp_path)
 
@@ -209,26 +218,32 @@ def _try_pdfminer(pdf_path: str) -> str:
         raise
 
 def _ocr_pdf(pdf_path: str, filename: str) -> Optional[str]:
-    """Perform OCR on PDF pages."""
+    """Rasterize PDF pages and OCR (needs poppler + tesseract)."""
     try:
         from pdf2image import convert_from_path
         import pytesseract
-
-        images = convert_from_path(pdf_path, dpi=300)
-        ocr_pages = []
-
-        for i, image in enumerate(images, 1):
-            text = pytesseract.image_to_string(image, lang='eng')
-            if text and text.strip():
-                ocr_pages.append(f"--- Page {i} ---\n{text}")
-
-        return "\n\n".join(ocr_pages) if ocr_pages else None
-    except ImportError:
-        logger.debug("OCR libraries not installed")
+    except ImportError as e:
+        logger.warning(f"OCR deps missing: {e}")
         return None
+    try:
+        # Limit pages for speed/memory; high DPI for exam papers
+        images = convert_from_path(pdf_path, dpi=200, first_page=1, last_page=15)
+        chunks = []
+        for i, img in enumerate(images, 1):
+            try:
+                text = pytesseract.image_to_string(img) or ""
+                text = text.strip()
+                if text:
+                    chunks.append(f"--- Page {i} ---\n{text}")
+            except Exception as pe:
+                logger.debug(f"OCR page {i} failed: {pe}")
+        if chunks:
+            return "\n\n".join(chunks)
     except Exception as e:
-        logger.debug(f"OCR failed: {e}")
-        return None
+        logger.warning(f"PDF OCR failed for {filename}: {e}")
+    return None
+
+
 
 def _format_pdf_error(filename: str) -> str:
     return (
@@ -245,65 +260,171 @@ def _format_pdf_error(filename: str) -> str:
 # ==========================================================
 # IMAGE PROCESSING
 # ==========================================================
+
 def _process_image(content: bytes, filename: str) -> str:
-    """Generate caption for image using Hugging Face BLIP."""
-    tmp_path = _save_temp_file(content, suffix='.jpg')
+    """
+    Analyze image with multi-provider fallback:
+    1) Local OCR (pytesseract) — free, offline
+    2) Gemini vision — if GOOGLE_API_KEY set
+    3) Hugging Face BLIP caption — if HF_TOKEN set
+    Always returns usable context for the chat LLM.
+    """
+    parts: List[str] = [f"[IMAGE: {filename}]"]
+    ocr_text = _ocr_image_bytes(content)
+    if ocr_text:
+        parts.append("### Text visible in image (OCR)\n" + ocr_text[:8000])
 
-    try:
-        # Validate image with PIL before sending to API
+    caption = None
+    # Gemini vision
+    if GOOGLE_API_KEY:
         try:
-            from PIL import Image
-            with Image.open(tmp_path) as img:
-                if img.size[0] < 10 or img.size[1] < 10:
-                    return f"[Image: {filename}] - Image is too small to process."
-                logger.debug(f"Image dimensions: {img.size}")
-        except ImportError:
-            logger.debug("Pillow not installed, skipping validation")
+            caption = _gemini_describe_image(content, filename)
+            if caption:
+                parts.append("### Visual description (Gemini)\n" + caption[:6000])
         except Exception as e:
-            logger.debug(f"Image validation failed: {e}")
+            logger.warning(f"Gemini image analysis failed: {e}")
 
-        if not HF_TOKEN:
-            logger.warning("No HF_TOKEN set for image processing")
-            return f"[Image: {filename}] - No HF_TOKEN set. Cannot analyze image."
+    # HF BLIP
+    if not caption and HF_TOKEN:
+        try:
+            caption = _hf_caption_image(content)
+            if caption:
+                parts.append("### Caption (Hugging Face)\n" + caption[:4000])
+        except Exception as e:
+            logger.warning(f"HF caption failed: {e}")
 
-        headers = {"Authorization": f"Bearer {HF_TOKEN}"}
-        
-        # Read and send image to BLIP
-        with open(tmp_path, "rb") as f:
-            resp = requests.post(HF_API_IMAGE, headers=headers, data=f.read(), timeout=30)
+    if len(parts) == 1:
+        # Still give the model something to work with
+        parts.append(
+            "Could not run OCR or cloud vision (install tesseract-ocr and/or set "
+            "GOOGLE_API_KEY or HF_TOKEN). File was received; ask the user to describe it."
+        )
+        return "\n\n".join(parts)
 
-        if resp.status_code != 200:
-            logger.warning(f"Image analysis failed: HTTP {resp.status_code}")
-            return f"[Image analysis failed: HTTP {resp.status_code}]"
+    parts.append(
+        "Use the OCR text and description above to answer the user's question about this image."
+    )
+    return "\n\n".join(parts)
 
-        result = resp.json()
-        caption = ""
 
-        if isinstance(result, list) and len(result) > 0:
-            caption = result[0].get("generated_text", "")
-        elif isinstance(result, dict):
-            caption = result.get("generated_text", str(result))
-        else:
-            caption = str(result)
-
-        logger.info(f"Image processed: {filename} - Caption: {caption[:50]}...")
-        return f"[Image: {filename}]\nDescription: {caption}" if caption else f"[Image: {filename} - No description]"
-    
-    except requests.exceptions.Timeout:
-        logger.error(f"Image analysis timed out for '{filename}'")
-        return f"[Image analysis timed out for '{filename}']"
-    except requests.exceptions.ConnectionError:
-        logger.error(f"Image analysis failed: Could not connect to Hugging Face API")
-        return f"[Image analysis failed: Could not connect to Hugging Face API]"
+def _ocr_image_bytes(content: bytes) -> Optional[str]:
+    """Local OCR via pytesseract + Pillow (no API key)."""
+    try:
+        from PIL import Image
+        import pytesseract
+        img = Image.open(io.BytesIO(content))
+        if img.mode not in ("RGB", "L"):
+            img = img.convert("RGB")
+        # Slight upscale helps small exam scans
+        w, h = img.size
+        if max(w, h) < 1200:
+            scale = 1200 / max(w, h)
+            img = img.resize((int(w * scale), int(h * scale)), Image.Resampling.LANCZOS)
+        text = pytesseract.image_to_string(img) or ""
+        text = text.strip()
+        if len(text) >= 3:
+            logger.info(f"OCR extracted {len(text)} chars from image")
+            return text
+    except ImportError:
+        logger.warning("Pillow/pytesseract not available for image OCR")
     except Exception as e:
-        logger.error(f"Image analysis error: {e}")
-        return f"[Could not analyze image '{filename}': {str(e)}]"
-    finally:
-        _cleanup_temp_file(tmp_path)
+        logger.warning(f"Image OCR failed: {e}")
+    return None
 
-# ==========================================================
-# AUDIO PROCESSING (Paid OpenAI + Free HF + Local)
-# ==========================================================
+
+def _gemini_describe_image(content: bytes, filename: str) -> Optional[str]:
+    """Use Google Gemini multimodal (free tier with API key)."""
+    import base64
+    b64 = base64.b64encode(content).decode("ascii")
+    # Detect mime
+    mime = "image/jpeg"
+    low = (filename or "").lower()
+    if low.endswith(".png"):
+        mime = "image/png"
+    elif low.endswith(".webp"):
+        mime = "image/webp"
+    elif low.endswith(".gif"):
+        mime = "image/gif"
+
+    models = [
+        "gemini-2.0-flash",
+        "gemini-2.5-flash",
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-latest",
+    ]
+    prompt = (
+        "You are a careful visual analyst. Describe EVERYTHING visible in this image with high detail.\n"
+        "- If screenshot: name the apps/windows, UI text, colors, layout.\n"
+        "- If logo/branding: describe symbols, colors, slogan text exactly.\n"
+        "- If exam/diagram: extract all numbers, labels, options A-D, axes, equations.\n"
+        "- If photo: subjects, setting, text on signs.\n"
+        "Never give a vague summary. Prefer specific observed details over guesses."
+    )
+    for model in models:
+        try:
+            url = (
+                f"https://generativelanguage.googleapis.com/v1beta/models/"
+                f"{model}:generateContent?key={GOOGLE_API_KEY}"
+            )
+            body = {
+                "contents": [{
+                    "parts": [
+                        {"text": prompt},
+                        {"inline_data": {"mime_type": mime, "data": b64}},
+                    ]
+                }],
+                "generationConfig": {"temperature": 0.2, "maxOutputTokens": 2048},
+            }
+            resp = requests.post(url, json=body, timeout=60)
+            if resp.status_code != 200:
+                logger.debug(f"Gemini {model} image: {resp.status_code} {resp.text[:200]}")
+                continue
+            data = resp.json()
+            cands = data.get("candidates") or []
+            if not cands:
+                continue
+            parts = (cands[0].get("content") or {}).get("parts") or []
+            text = "".join(p.get("text", "") for p in parts).strip()
+            if text:
+                logger.info(f"Gemini vision OK via {model} ({len(text)} chars)")
+                return text
+        except Exception as e:
+            logger.debug(f"Gemini {model} error: {e}")
+            continue
+    return None
+
+
+def _hf_caption_image(content: bytes) -> Optional[str]:
+    """Hugging Face BLIP captioning."""
+    headers = {"Authorization": f"Bearer {HF_TOKEN}"}
+    for url in HF_IMAGE_MODELS:
+        try:
+            resp = requests.post(url, headers=headers, data=content, timeout=45)
+            if resp.status_code == 503:
+                # model loading
+                import time
+                time.sleep(3)
+                resp = requests.post(url, headers=headers, data=content, timeout=60)
+            if resp.status_code != 200:
+                logger.debug(f"HF caption {resp.status_code}: {resp.text[:150]}")
+                continue
+            data = resp.json()
+            if isinstance(data, list) and data:
+                text = data[0].get("generated_text") or data[0].get("caption") or ""
+            elif isinstance(data, dict):
+                text = data.get("generated_text") or data.get("caption") or str(data)
+            else:
+                text = str(data)
+            text = (text or "").strip()
+            if text:
+                return text
+        except Exception as e:
+            logger.debug(f"HF caption error: {e}")
+            continue
+    return None
+
+
+
 def _process_audio(content: bytes, filename: str) -> str:
     """
     Transcribe audio using Whisper.

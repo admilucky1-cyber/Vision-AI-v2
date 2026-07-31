@@ -379,22 +379,27 @@
                     return;
                 }
 
+                const recent = Array.isArray(data.recent_queries) ? data.recent_queries : [];
+                const total = data.total_entries ?? data.entries ?? 0;
+                const maxSize = data.max_cache_size ?? 200;
+                const dur = data.cache_duration_seconds ?? 3600;
+
                 overview.innerHTML = `
-                    <div class="stat-item"><span class="stat-value">${data.total_entries}</span><span class="stat-label">Total Entries</span></div>
-                    <div class="stat-item"><span class="stat-value">${data.max_cache_size}</span><span class="stat-label">Max Cache Size</span></div>
-                    <div class="stat-item"><span class="stat-value">${data.cache_duration_seconds / 60}m</span><span class="stat-label">Cache Duration</span></div>
+                    <div class="stat-item"><span class="stat-value">${total}</span><span class="stat-label">Total Entries</span></div>
+                    <div class="stat-item"><span class="stat-value">${maxSize}</span><span class="stat-label">Max Cache Size</span></div>
+                    <div class="stat-item"><span class="stat-value">${Math.round(dur / 60)}m</span><span class="stat-label">Cache Duration</span></div>
                 `;
 
-                if (data.recent_queries.length === 0) {
+                if (recent.length === 0) {
                     tbody.innerHTML = `<tr><td colspan="4" class="empty">No recent queries</td></tr>`;
                     return;
                 }
 
-                tbody.innerHTML = data.recent_queries.map(q => `
+                tbody.innerHTML = recent.map(q => `
                     <tr>
-                        <td><code>${q.query}</code></td>
-                        <td>${q.age_human}</td>
-                        <td>${q.result_length} chars</td>
+                        <td><code>${(q.query || q.key || '—')}</code></td>
+                        <td>${q.age_human || '—'}</td>
+                        <td>${q.result_length != null ? q.result_length + ' chars' : '—'}</td>
                         <td><span class="badge ${q.is_stale ? 'stale' : 'fresh'}">${q.is_stale ? '⏰ Stale' : '✅ Fresh'}</span></td>
                     </tr>
                 `).join('');

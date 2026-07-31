@@ -115,6 +115,7 @@ function showToast(message, type = 'info', duration = 3000) {
     const icons = { error: '⚠️', success: '✅', info: 'ℹ️' };
     toast.innerHTML = `<span>${icons[type] || 'ℹ️'}</span><span>${escapeHtml(String(message))}</span>`;
     toast.style.cssText = `
+        position: relative;
         padding: 12px 16px;
         border-radius: 10px;
         background: var(--bg-secondary);
@@ -162,11 +163,20 @@ if (!document.getElementById('toastStyles')) {
 window.toggleSidebar = function() {
     const sidebar = document.getElementById('sidebar');
     if (!sidebar) return;
+    // Always force reflow to avoid stuck state after resize
+    void sidebar.offsetWidth;
     const isMobile = window.innerWidth <= 768;
 
     if (isMobile) {
         sidebar.classList.toggle('open-mobile');
-        const overlay = document.getElementById('sidebar-overlay');
+        let overlay = document.getElementById('sidebar-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'sidebar-overlay';
+            overlay.className = 'sidebar-overlay';
+            overlay.onclick = () => closeMobileSidebar();
+            document.body.appendChild(overlay);
+        }
         if (overlay) overlay.classList.toggle('active');
     } else {
         sidebar.classList.toggle('rail-mode');
@@ -354,13 +364,20 @@ function loadChat(id) {
 async function clearAllCaches() {
     try {
         const res = await authenticatedFetch('/chat/clear-cache', { method: 'POST' });
-        if (res.ok) { 
-            showToast('RAG cache cleared', 'success'); 
-        } else {
-            showToast('Failed to clear cache', 'error');
+        if (!res) {
+            showToast('Please log in again', 'error');
+            return;
         }
-    } catch (e) { 
-        showToast('Failed to clear cache: ' + e.message, 'error'); 
+        let data = {};
+        try { data = await res.json(); } catch (_) {}
+        if (res.ok) {
+            showToast(data.message || 'Caches cleared', 'success');
+        } else {
+            const detail = data.detail || data.message || ('HTTP ' + res.status);
+            showToast('Failed to clear cache: ' + detail, 'error', 5000);
+        }
+    } catch (e) {
+        showToast('Failed to clear cache: ' + e.message, 'error');
     }
 }
 
@@ -432,6 +449,8 @@ function addMessage(role, text, images = null, modelUsed = null, ragCount = 0, s
         );
         html += `<div class="msg-actions">
             <button type="button" class="msg-action-btn" onclick="copyMessageText(this)" title="Copy">📋 Copy</button>
+            <button type="button" class="msg-action-btn speak-btn" onclick="event.stopPropagation();speakMessage(this)" title="Read aloud">🔊 Speak</button>
+            <button type="button" class="msg-action-btn" onclick="event.stopPropagation();stopSpeaking()" title="Stop voice">⏹</button>
             <button type="button" class="msg-action-btn" onclick="toggleExpandMessage(this)" title="Expand height">↕ Height</button>
             <button type="button" class="msg-action-btn" onclick="toggleWideMessage(this)" title="Wider message">↔ Width</button>
             <button type="button" class="msg-action-btn" onclick="zoomMessage(this, 1.1)" title="Zoom in">🔍+</button>
@@ -523,12 +542,11 @@ function sendEdit() {
 // DYNAMIC LOADING / TYPING INDICATOR
 // ============================================================
 const LOADING_STATUSES = [
-    { title: "Analyzing your request…", sub: "Understanding intent" },
-    { title: "Thinking…", sub: "Reasoning step by step" },
-    { title: "Contacting AI model…", sub: "Routing to best provider" },
-    { title: "Generating response…", sub: "Writing a clear answer" },
-    { title: "Polishing output…", sub: "Formatting for readability" },
-    { title: "Almost there…", sub: "Final checks" },
+    { title: 'Receiving your request…', sub: 'Files, links, and text are being prepared' },
+    { title: 'Processing documents…', sub: 'PDF / image OCR can take up to 1–2 minutes' },
+    { title: 'Fetching media / search…', sub: 'YouTube and web data if needed' },
+    { title: 'Running AI model…', sub: 'Generating a detailed answer' },
+    { title: 'Finishing response…', sub: 'Formatting and diagrams' },
 ];
 
 let loadingStatusIndex = 0;
@@ -557,6 +575,8 @@ function showLoading() {
                 <div class="loader-text-wrap">
                     <span id="loadingStatus">${LOADING_STATUSES[0].title}</span>
                     <span id="loadingSub">${LOADING_STATUSES[0].sub}</span>
+                    <div class="progress-track" aria-hidden="true"><div class="progress-fill" id="loadingProgress"></div></div>
+                    <span id="loadingEta" class="loading-eta">Working… large files can take 30–120s</span>
                 </div>
             </div>
         </div>
@@ -564,6 +584,23 @@ function showLoading() {
     output.appendChild(row);
     output.scrollTop = output.scrollHeight;
 
+    window._progressPct = 8;
+    const pEl = document.getElementById('loadingProgress');
+    if (pEl) pEl.style.width = '8%';
+    if (window._progressTimer) clearInterval(window._progressTimer);
+    window._progressTimer = setInterval(() => {
+        // asymptotic progress (never hits 100 until done)
+        window._progressPct = Math.min(92, window._progressPct + Math.max(0.4, (92 - window._progressPct) * 0.035));
+        const bar = document.getElementById('loadingProgress');
+        if (bar) bar.style.width = window._progressPct.toFixed(1) + '%';
+        const eta = document.getElementById('loadingEta');
+        if (eta) {
+            if (window._progressPct < 25) eta.textContent = 'Starting…';
+            else if (window._progressPct < 50) eta.textContent = 'Reading files / links…';
+            else if (window._progressPct < 75) eta.textContent = 'Model is thinking…';
+            else eta.textContent = 'Almost done…';
+        }
+    }, 400);
     loadingStatusInterval = setInterval(() => {
         loadingStatusIndex = (loadingStatusIndex + 1) % LOADING_STATUSES.length;
         const el = document.getElementById('loadingStatus');
@@ -589,6 +626,10 @@ function updateLoadingStatus(msg) {
 }
 
 function removeLoading() {
+    if (window._progressTimer) { clearInterval(window._progressTimer); window._progressTimer = null; }
+    const bar = document.getElementById('loadingProgress');
+    if (bar) bar.style.width = '100%';
+
     const el = document.getElementById('loadingRow') || document.getElementById('loadingMsg');
     if (el) el.remove();
     if (loadingStatusInterval) {
@@ -596,6 +637,31 @@ function removeLoading() {
         loadingStatusInterval = null;
     }
 }
+
+
+function stopGeneration() {
+    window._userStopped = true;
+    try {
+        if (window._activeChatAbort) {
+            window._activeChatAbort.abort();
+            window._activeChatAbort = null;
+        }
+    } catch (_) {}
+    removeLoading();
+    const sendBtn = document.getElementById('sendBtn');
+    if (sendBtn) sendBtn.disabled = false;
+    const stopBtn = document.getElementById('stopBtn');
+    if (stopBtn) stopBtn.hidden = true;
+    // Restore last draft so user can edit
+    const input = document.getElementById('message');
+    if (input && window._lastDraftMessage) {
+        input.value = window._lastDraftMessage;
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.focus();
+    }
+    showToast('Stopped — edit your message and send again', 'info', 3500);
+}
+window.stopGeneration = stopGeneration;
 
 async function sendMessage() {
     const msgInput = document.getElementById('message');
@@ -607,6 +673,7 @@ async function sendMessage() {
     const filesToUpload = Array.from(fileInput ? fileInput.files : []); 
 
     if (!msg && filesToUpload.length === 0) return;
+    window._lastDraftMessage = msg;
 
     const wasEditing = isEditMode;
     if (wasEditing) cancelEdit();
@@ -651,10 +718,17 @@ async function sendMessage() {
     if (fileInput) fileInput.value = ''; 
     renderFilePreview(); 
     if (sendBtn) sendBtn.disabled = true;
+    const stopBtn = document.getElementById('stopBtn');
+    if (stopBtn) stopBtn.hidden = false;
     showLoading();
 
     const formData = new FormData();
     formData.append('message', msg);
+    // Short context so "what is this chat about" uses this thread
+    try {
+        const recent = (chat.messages || []).slice(-6).map(m => (m.role + ': ' + (m.text || '').slice(0, 200))).join('\n');
+        if (recent) formData.append('history_hint', recent.slice(0, 1500));
+    } catch (_) {}
     const modelSelector = document.getElementById('modelSelector');
     formData.append('model', modelSelector ? modelSelector.value : 'default');
     formData.append('generate_images', 'true');
@@ -666,6 +740,7 @@ async function sendMessage() {
     try {
         updateLoadingStatus("Contacting AI model...");
         const controller = new AbortController();
+        window._activeChatAbort = controller;
         // Downloads / long transcripts need more than the default chat budget
         const isHeavy = /download|transcript|youtube\.com|youtu\.be|mp3|1080p|720p/i.test(userMessage || '');
         const timeoutMs = isHeavy ? 600000 : 90000; // 10 min for media, 90s for chat
@@ -679,11 +754,13 @@ async function sendMessage() {
             });
         } finally {
             clearTimeout(timeoutId);
+            window._activeChatAbort = null;
         }
         updateLoadingStatus("Generating response...");
         const data = await res.json();
         removeLoading();
         if (sendBtn) sendBtn.disabled = false;
+        if (stopBtn) stopBtn.hidden = true;
         if (res.ok) {
             // ✅ UPDATED: Pass badge data to addMessage
             addMessage(
@@ -710,7 +787,17 @@ async function sendMessage() {
     } catch (err) {
         removeLoading();
         if (sendBtn) sendBtn.disabled = false;
+        const stopBtn2 = document.getElementById('stopBtn');
+        if (stopBtn2) stopBtn2.hidden = true;
         if (err.name === 'AbortError') {
+            // User stop vs timeout
+            if (window._userStopped) {
+                window._userStopped = false;
+                addMessage('ai', '⏹ Stopped. Edit your message above and press Send to continue.');
+                showToast('Generation stopped', 'info');
+                return;
+            }
+
             addMessage('ai', '❌ The request timed out. The AI model may be taking too long or the server may be unresponsive.');
             showToast('Request timed out. Try again or use a shorter clip.', 'error');
         } else {
@@ -845,18 +932,21 @@ function updateThemeIcon(theme) {
 }
 
 function toggleTheme() {
-    const current = document.documentElement.getAttribute('data-theme');
-    let nextTheme;
-    if (current === 'dark') {
-        nextTheme = 'light';
-    } else if (current === 'light') {
-        nextTheme = 'system';
-    } else {
-        nextTheme = 'dark';
+    try {
+        const current = document.documentElement.getAttribute('data-theme') || localStorage.getItem('vision_ai_theme') || 'dark';
+        const nextTheme = (current === 'light') ? 'dark' : 'light';
+        applyTheme(nextTheme);
+        localStorage.setItem('vision_ai_theme', nextTheme);
+        if (typeof updateThemeIcon === 'function') updateThemeIcon(nextTheme);
+        ['floatingThemeToggle','headerThemeBtn'].forEach(id => {
+            const btn = document.getElementById(id);
+            if (btn) btn.textContent = nextTheme === 'light' ? '☀️' : '🌙';
+        });
+    } catch (e) {
+        console.error(e);
+        const cur = document.documentElement.getAttribute('data-theme');
+        document.documentElement.setAttribute('data-theme', cur === 'light' ? 'dark' : 'light');
     }
-    applyTheme(nextTheme);
-    localStorage.setItem('vision_ai_theme', nextTheme);
-    updateThemeIcon(nextTheme);
 }
 
 // ============================================================
@@ -871,126 +961,76 @@ let isRecentMode = false;
 let activeTag = null;
 
 const PROMPT_LIBRARY = {
-    "YouTube": {
-        icon: "🎥",
-        color: "#ff4d4d",
-        tags: ["video", "transcript", "download"],
+    "Study & Exams": {
+        icon: "🎓", color: "#06b6d4", tags: ["exam","physics","igcse"],
         prompts: [
-            { t: "Summarize this video using its full transcript: [URL]", tags: ["transcript", "summary"] },
-            { t: "Get metadata (title, duration, views, uploader) for: [URL]", tags: ["metadata"] },
-            { t: "Extract key timestamps and chapters from: [URL]", tags: ["transcript", "timestamps"] },
-            { t: "Get the full transcript with timestamps for: [URL]", tags: ["transcript"] },
-            { t: "Translate the transcript of [URL] to Urdu", tags: ["transcript", "translate"] },
-            { t: "Download audio (MP3, best quality) from: [URL]", tags: ["download", "audio"] },
-            { t: "Download video in 1080p MP4 from: [URL]", tags: ["download", "video"] },
-            { t: "Download video in 720p from: [URL]", tags: ["download", "video"] },
-            { t: "List all available download formats for: [URL]", tags: ["download"] },
-            { t: "Create a study guide from the transcript of: [URL]", tags: ["transcript", "study"] },
-            { t: "Generate a 10-question quiz based on this video: [URL]", tags: ["transcript", "quiz"] },
-            { t: "Compare content of these two videos: [URL1] and [URL2]", tags: ["compare"] }
+            { title: "IGCSE Physics paper solver", t: "You are a Cambridge IGCSE/A-Level physics examiner-tutor. Solve the uploaded paper question-by-question.\nFor each Q: (1) what is asked (2) formula/concept (3) numbers + units (4) final answer / option letter.\nIf a diagram is required but not in the text, say so. Never invent options.", tags: ["exam","physics"] },
+            { title: "Master-level concept deep dive", t: "Explain [concept] at Master's physics level: rigorous math, assumptions, limits of the model, and one real experiment or application.", tags: ["explain"] },
+            { title: "Quiz from document/video", t: "From the uploaded document or video transcript only, create a 10-question quiz with answers and short explanations. Match the source language (Urdu/English).", tags: ["exam"] },
+            { title: "Revision sheet", t: "One-page revision sheet for [topic]: core formulas, 5 common exam mistakes, 3 practice questions with answers.", tags: ["exam"] },
+            { title: "Guided problem solve", t: "Solve step-by-step and PAUSE after each step so I can attempt the next: [problem]", tags: ["explain"] },
+            { title: "Theory comparison", t: "Compare [Theory A] vs [Theory B]: assumptions, equations, evidence, and when to use each.", tags: ["explain"] }
         ]
     },
-    "Writing": {
-        icon: "✍️",
-        color: "#7B68EE",
-        tags: ["email", "copy", "rewrite"],
+    "YouTube & Media": {
+        icon: "🎥", color: "#ef4444", tags: ["youtube","quiz","download"],
         prompts: [
-            { t: "Write a professional email replying to: [context]", tags: ["email"] },
-            { t: "Write a persuasive sales pitch for [product]", tags: ["copy"] },
-            { t: "Generate 5 catchy headlines for [topic]", tags: ["copy"] },
-            { t: "Rewrite this text in a formal tone: [text]", tags: ["rewrite"] },
-            { t: "Rewrite this text in a casual, friendly tone: [text]", tags: ["rewrite"] },
-            { t: "Summarize this article in 3 bullet points: [text]", tags: ["summary"] },
-            { t: "Write a LinkedIn post highlighting [achievement]", tags: ["copy"] },
-            { t: "Write a Twitter/X thread explaining [topic] in 5 tweets", tags: ["copy"] },
-            { t: "Translate this text to natural conversational Urdu: [text]", tags: ["translate"] },
-            { t: "Write a step-by-step guide for [task]", tags: ["guide"] },
-            { t: "Create a SWOT analysis for [business]", tags: ["analysis"] },
-            { t: "Write a product description that converts for [product]", tags: ["copy"] }
+            { title: "Urdu video summary", t: "اس یوٹیوب ویڈیو کا خلاصہ واضح پاکستانی اردو میں لکھیں: اہم نکات، ترتیبِ وقت، اور سبق۔\nلنک: [paste link]", tags: ["youtube","summary"] },
+            { title: "Urdu quiz from video", t: "اس یوٹیوب ویڈیو پر 10 سوالوں کا کوئز بنائیں — ہر سوال کے ساتھ درست جواب اور 1–2 سطری وضاحت۔\nلنک: [paste link]", tags: ["youtube","quiz"] },
+            { title: "English summary + timeline", t: "Summarize this YouTube video with timestamps and key takeaways.\nURL: [paste link]", tags: ["youtube"] },
+            { title: "List download formats", t: "List all available download formats (video + audio) with quality for: [paste YouTube URL]", tags: ["download"] },
+            { title: "Download MP3", t: "Download audio (MP3, best quality) from: [paste YouTube URL]", tags: ["download"] },
+            { title: "Teach from transcript", t: "Extract transcript then teach me as a short lesson with examples and a 5-question mini-test.\nURL: [paste link]", tags: ["youtube"] }
         ]
     },
     "Coding": {
-        icon: "💻",
-        color: "#00C6FF",
-        tags: ["python", "js", "api", "debug"],
+        icon: "💻", color: "#8b5cf6", tags: ["code","debug","api"],
         prompts: [
-            { t: "Write a Python script to [task]", tags: ["python"] },
-            { t: "Explain this code line-by-line: [code]", tags: ["explain"] },
-            { t: "Refactor this code to be cleaner and faster: [code]", tags: ["refactor"] },
-            { t: "Convert this Python code to JavaScript: [code]", tags: ["python", "js"] },
-            { t: "Write unit tests for this function: [code]", tags: ["test"] },
-            { t: "Create a REST API endpoint for [task] in FastAPI", tags: ["api", "python"] },
-            { t: "Write a Dockerfile for a Python FastAPI app", tags: ["docker"] },
-            { t: "Debug this error: [error message]", tags: ["debug"] },
-            { t: "Optimize this slow SQL query: [query]", tags: ["sql"] },
-            { t: "Create JWT authentication in FastAPI", tags: ["api", "python"] },
-            { t: "Build a file upload endpoint with FastAPI", tags: ["api"] },
-            { t: "Write a React component for [UI element]", tags: ["js"] }
+            { title: "Production code review", t: "Act as a senior engineer. Review for bugs, security, and performance. Give a minimal production-ready fix.\n\n```\n[paste code]\n```", tags: ["code","debug"] },
+            { title: "Implement feature", t: "Write production-ready [language] for: [feature]. Include errors, tests/docstrings, and a short usage example.", tags: ["code"] },
+            { title: "Refactor SOLID", t: "Refactor for SOLID and clarity without changing behavior. List changes.\n\n```\n[paste code]\n```", tags: ["code"] },
+            { title: "REST API design", t: "Design REST API for [domain]: endpoints, JSON shapes, auth, validation, error codes.", tags: ["api"] },
+            { title: "Debug error", t: "Root-cause this error and give the exact fix.\nError:\n[paste]\nCode:\n[paste]", tags: ["debug"] }
         ]
     },
-    "Diagrams": {
-        icon: "📊",
-        color: "#22c55e",
-        tags: ["chart", "flowchart", "uml"],
+    "Data & BI": {
+        icon: "📊", color: "#10b981", tags: ["sql","bi","analytics"],
         prompts: [
-            { t: "Create a pie chart showing [data]", tags: ["chart"] },
-            { t: "Create a bar chart comparing [data1] and [data2]", tags: ["chart"] },
-            { t: "Create a flowchart for [process]", tags: ["flowchart"] },
-            { t: "Create an organizational chart for [company]", tags: ["org"] },
-            { t: "Create a mind map for [topic]", tags: ["mindmap"] },
-            { t: "Create a sequence diagram for [system]", tags: ["uml"] },
-            { t: "Create an ER diagram for [database]", tags: ["uml"] },
-            { t: "Create a Gantt chart for [project]", tags: ["chart"] },
-            { t: "Create a UML class diagram for [system]", tags: ["uml"] },
-            { t: "Visualize this data as a line chart: [data]", tags: ["chart"] }
+            { title: "Teach document + exam", t: "Teach the uploaded document as a lesson (objectives → concepts → examples). Then give a 10-question exam with answers.", tags: ["analytics"] },
+            { title: "SQL expert", t: "Write optimized SQL for: [question]. Note indexes and edge cases.\nSchema:\n[paste]", tags: ["sql"] },
+            { title: "Dashboard KPIs", t: "Design Power BI / dashboard KPIs for [business]: metrics, visuals, filters.", tags: ["bi"] },
+            { title: "Dataset insights", t: "Propose cleaning steps, charts, and 5 insights for:\n[describe or paste data]", tags: ["analytics"] }
         ]
     },
-    "Search": {
-        icon: "🌐",
-        color: "#f59e0b",
-        tags: ["web", "news", "research"],
+    "Writing": {
+        icon: "✍️", color: "#f59e0b", tags: ["email","urdu","rewrite"],
         prompts: [
-            { t: "Search the web for the latest news on [topic]", tags: ["news"] },
-            { t: "Search the web for tutorials on [topic]", tags: ["research"] },
-            { t: "Find the current stock price of [company]", tags: ["finance"] },
-            { t: "Get the current weather forecast for [city]", tags: ["weather"] },
-            { t: "Get the latest updates on [trending topic]", tags: ["news"] },
-            { t: "Search for peer-reviewed articles on [research topic]", tags: ["research"] },
-            { t: "Find the best practices for [skill/task]", tags: ["research"] },
-            { t: "Search the web for the best tools for [task]", tags: ["research"] }
+            { title: "Polish English", t: "Rewrite in clear professional English; keep meaning:\n\n[paste text]", tags: ["rewrite"] },
+            { title: "Pakistani Urdu polish", t: "اس متن کو درست، روان پاکستانی اردو میں لکھیں:\n\n[متن]", tags: ["urdu"] },
+            { title: "Professional email", t: "Draft email about [topic] for [audience]: subject + body + CTA.", tags: ["email"] },
+            { title: "Executive summary", t: "5 bullets + 2-sentence executive summary:\n\n[paste]", tags: ["rewrite"] }
         ]
     },
-    "Documents": {
-        icon: "📄",
-        color: "#a855f7",
-        tags: ["pdf", "rag", "extract"],
+    "Career": {
+        icon: "🚀", color: "#3b82f6", tags: ["cv","interview","plan"],
         prompts: [
-            { t: "What are the key findings of this document?", tags: ["rag"] },
-            { t: "Summarize this PDF in 3 paragraphs", tags: ["pdf", "summary"] },
-            { t: "Extract all statistics from this report", tags: ["extract"] },
-            { t: "List all dates and deadlines mentioned", tags: ["extract"] },
-            { t: "Generate a FAQ from this user manual", tags: ["rag"] },
-            { t: "Extract all names and emails from this file", tags: ["extract"] },
-            { t: "Describe this image in detail", tags: ["image"] },
-            { t: "Convert this image to text using OCR", tags: ["ocr"] },
-            { t: "Extract the first 5 rows from this Excel file", tags: ["excel"] },
-            { t: "Transcribe this audio file to text", tags: ["audio"] }
+            { title: "Physics → career plan", t: "I have a Master's in Physics. 6-month plan toward [data science / quant / software]: weekly milestones and free resources.", tags: ["plan"] },
+            { title: "CV bullet upgrade", t: "Rewrite this CV bullet with metric + action + result:\n[paste]", tags: ["cv"] },
+            { title: "Interview pack", t: "8 interview Q&As for [role], tailored to a physics graduate.", tags: ["interview"] }
         ]
     },
-    "Study": {
-        icon: "🎓",
-        color: "#06b6d4",
-        tags: ["learn", "exam", "explain"],
+    "Image & PDF": {
+        icon: "🖼️", color: "#ec4899", tags: ["image","pdf"],
         prompts: [
-            { t: "Explain [concept] like I'm 12 years old", tags: ["explain"] },
-            { t: "Create flashcards for [topic]", tags: ["exam"] },
-            { t: "Generate a practice exam on [subject] with answers", tags: ["exam"] },
-            { t: "Compare and contrast [A] vs [B]", tags: ["learn"] },
-            { t: "Create a one-page cheat sheet for [topic]", tags: ["exam"] },
-            { t: "Walk me through solving this step by step: [problem]", tags: ["explain"] }
+            { title: "Deep image analysis", t: "Describe every visible detail in the uploaded image (text, UI, diagrams, labels). Then answer: [question]", tags: ["image"] },
+            { title: "Exam PDF solver", t: "Solve the uploaded exam PDF question-by-question with formulas and final answers. State when a diagram is missing.", tags: ["pdf"] },
+            { title: "Notes from PDF", t: "Extract text from this document and turn it into structured revision notes.", tags: ["pdf"] },
+            { title: "Electrician / trade book", t: "Summarize this trade/training book chapter by chapter. List practical skills and safety rules. Language: [English or Urdu].", tags: ["pdf"] }
         ]
     }
 };
+
+
 
 function normalizePrompt(p) {
     if (typeof p === 'string') return { t: p, tags: [] };
@@ -1052,7 +1092,7 @@ function createHelpModal() {
                         <h2 style="font-size:20px; font-weight:800; color:var(--text-main); display:flex; align-items:center; gap:10px; letter-spacing:-0.3px;">
                             <span style="background:linear-gradient(135deg,#00C6FF,#7B68EE); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Prompt Studio</span>
                         </h2>
-                        <p style="color:var(--text-muted); font-size:13px; margin-top:4px;">Search • categories • tags • favorites • one-click copy</p>
+                        <p style="color:var(--text-muted); font-size:13px; margin-top:4px;">Click a card to load it into chat • edit placeholders • Send</p>
                     </div>
                     <div style="display:flex; gap:8px; align-items:center;">
                         <span id="promptCount" style="color:var(--text-muted); font-size:12px; background:var(--bg-tertiary); padding:4px 10px; border-radius:20px;">0</span>
@@ -1185,9 +1225,11 @@ function renderPrompts(category = currentCategory, searchTerm = '') {
         const escaped = text.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
         const isFav = favorites.includes(text);
         const tagsHtml = (p.tags || []).slice(0, 3).map(tg => `<span class="ps-tag">#${tg}</span>`).join('');
+        const title = p.title ? `<div class="ps-card-title">${escapeHtml(p.title)}</div>` : '';
         return `
-            <div class="ps-card" onclick="copyPrompt('${escaped}')" title="Click to copy">
-                <div class="ps-card-text">${escapeHtml(text)}</div>
+            <div class="ps-card" onclick="usePromptInChat('${escaped}')" title="Click to load into chat">
+                ${title}
+                <div class="ps-card-text">${escapeHtml((text.length > 140 ? text.slice(0, 140) + "…" : text))}</div>
                 <div class="ps-card-meta">
                     <div style="display:flex; gap:4px; flex-wrap:wrap; align-items:center;">
                         <span style="font-size:11px; color:var(--text-muted);">${p.icon || ''} ${escapeHtml(p.category || '')}</span>
@@ -1299,17 +1341,32 @@ function copyPrompt(text) {
 }
 
 function copyAndChat(text) {
-    copyPrompt(text);
-    setTimeout(() => {
-        const input = document.getElementById('message');
-        if (input) {
-            input.value = text;
-            input.focus();
-            input.dispatchEvent(new Event('input', { bubbles: true }));
-            toggleHelpModal();
-        }
-    }, 200);
+    usePromptInChat(text);
 }
+
+function usePromptInChat(text) {
+    recent = recent.filter(r => r !== text);
+    recent.unshift(text);
+    if (recent.length > 15) recent.pop();
+    localStorage.setItem('vision_ai_recent', JSON.stringify(recent));
+    updateStats();
+    const input = document.getElementById('message');
+    if (input) {
+        input.value = text;
+        input.focus();
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        // Place cursor at first [placeholder]
+        const m = text.match(/\[[^\]]+\]/);
+        if (m) {
+            const i = text.indexOf(m[0]);
+            try { input.setSelectionRange(i, i + m[0].length); } catch (_) {}
+        }
+    }
+    const modal = document.getElementById('helpModal');
+    if (modal) modal.style.display = 'none';
+    showToast('Prompt loaded in chat — edit placeholders then Send', 'success', 3000);
+}
+window.usePromptInChat = usePromptInChat;
 
 function updateStats() {
     const fc = document.getElementById('favoriteCount');
@@ -1425,7 +1482,7 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (_) {}
     }
     if (isAdmin) {
-        if (adminBtn) adminBtn.style.display = 'flex';
+        if (adminBtn) /* adminBtn moved to top bar */;
         if (adminPayBtn) adminPayBtn.style.display = 'flex';
     }
 })();
@@ -1437,6 +1494,13 @@ document.addEventListener('DOMContentLoaded', function() {
 // FILE PREVIEW
 // ============================================================
 function renderFilePreview() {
+    try {
+        const fi = document.getElementById('fileInput');
+        if (fi && Array.from(fi.files || []).some(f => (f.type || '').startsWith('image/'))) {
+            showToast('Image attached — ask what you see or “solve this diagram”', 'info', 2500);
+        }
+    } catch (_) {}
+
     const fileInput = document.getElementById('fileInput');
     const previewArea = document.getElementById('filePreviewArea');
     if (!fileInput || !previewArea) return;
@@ -1531,6 +1595,7 @@ function toggleExpandMessage(btn) {
     const bubble = btn.closest('.message-bubble');
     const body = bubble && bubble.querySelector('.markdown-content');
     if (!body) return;
+    bubble.classList.toggle('msg-tall');
     body.classList.toggle('msg-expanded-height');
     btn.classList.toggle('active');
     btn.textContent = body.classList.contains('msg-expanded-height') ? '▴ Collapse' : '↕ Height';
@@ -1540,6 +1605,7 @@ function toggleWideMessage(btn) {
     const bubble = btn.closest('.message-bubble');
     if (!bubble) return;
     bubble.classList.toggle('msg-wide');
+    bubble.classList.toggle('msg-tall');
     btn.classList.toggle('active');
     btn.textContent = bubble.classList.contains('msg-wide') ? '↔ Narrow' : '↔ Width';
 }
@@ -1599,6 +1665,14 @@ function closeMsgFullscreen() {
 function toggleChatFocusMode() {
     document.body.classList.toggle('chat-focus-mode');
     const on = document.body.classList.contains('chat-focus-mode');
+    // Browser fullscreen for true focus
+    try {
+        if (on && !document.fullscreenElement) {
+            document.documentElement.requestFullscreen?.();
+        } else if (!on && document.fullscreenElement) {
+            document.exitFullscreen?.();
+        }
+    } catch (_) {}
     // Subtle status only — avoid toast spam
     const btn = document.querySelector('[onclick="toggleChatFocusMode()"]');
     if (btn) btn.classList.toggle('active', on);
@@ -1618,6 +1692,241 @@ window.toggleWideMessage = toggleWideMessage;
 window.editMessage = editMessage;
 window.cancelEdit = cancelEdit;
 window.sendEdit = sendEdit;
+
+// ============================================================
+// VOICE INPUT (Web Speech API) + VOICE OUTPUT (speechSynthesis)
+// ============================================================
+let _recognition = null;
+let _listening = false;
+let _currentUtterance = null;
+
+function fillPrompt(text) {
+    const ta = document.getElementById('message');
+    if (!ta) return;
+    ta.value = text;
+    ta.focus();
+    ta.dispatchEvent(new Event('input'));
+}
+
+function _getSpeechRecognition() {
+    return window.SpeechRecognition || window.webkitSpeechRecognition || null;
+}
+
+
+function toggleVoiceInput() {
+    if (_listening) {
+        stopVoiceInput();
+        return;
+    }
+    startVoiceInput();
+}
+
+async function startVoiceInput() {
+    const ta = document.getElementById('message');
+    const status = document.getElementById('voiceStatus');
+    const mic = document.getElementById('micBtn');
+
+    // Secure context required (localhost or https)
+    if (typeof window.isSecureContext === 'boolean' && !window.isSecureContext) {
+        showToast('Mic only works on http://localhost:5050 or HTTPS (not http://192.168.x.x).', 'error', 8000);
+        return;
+    }
+
+    const Rec = _getSpeechRecognition();
+    if (!Rec) {
+        showToast('Voice input needs Chrome, Edge, or Safari. Firefox has limited support.', 'error', 5000);
+        return;
+    }
+
+    // Ask for mic permission explicitly (gives clearer prompt)
+    try {
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            stream.getTracks().forEach(t => t.stop());
+        }
+    } catch (permErr) {
+        console.warn(permErr);
+        showToast('Microphone blocked. Address bar lock → Site settings → Microphone → Allow → Reload. Use localhost or HTTPS.', 'error', 9000);
+        return;
+    }
+
+    try {
+        const rec = new Rec();
+        rec.continuous = true;
+        rec.interimResults = true;
+        rec.maxAlternatives = 1;
+        const sttLang = localStorage.getItem('vision_ai_stt_lang')
+            || localStorage.getItem('vision_ai_voice_lang')
+            || 'en-US';
+        rec.lang = sttLang;
+
+        let finalText = ta ? ta.value : '';
+
+        rec.onstart = () => {
+            _listening = true;
+            if (status) { status.hidden = false; status.textContent = 'Listening… tap mic again to stop'; }
+            if (mic) mic.classList.add('mic-active');
+            showToast('Listening…', 'info', 1500);
+        };
+        rec.onresult = (event) => {
+            let interim = '';
+            let piece = finalText;
+            for (let i = event.resultIndex; i < event.results.length; i++) {
+                const r = event.results[i];
+                if (r.isFinal) piece = (piece ? piece + ' ' : '') + r[0].transcript;
+                else interim += r[0].transcript;
+            }
+            finalText = piece;
+            if (ta) {
+                ta.value = (piece + (interim ? ' ' + interim : '')).trim();
+                ta.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+        };
+        rec.onerror = (e) => {
+            console.warn('speech error', e);
+            if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+                showToast('Mic permission denied. Use localhost/HTTPS and Allow microphone in site settings.', 'error', 8000);
+                stopVoiceInput();
+            } else if (e.error === 'no-speech') {
+                showToast('No speech heard — try again closer to the mic', 'info', 3000);
+            } else if (e.error !== 'aborted') {
+                showToast('Voice error: ' + e.error, 'error');
+                stopVoiceInput();
+            }
+        };
+        rec.onend = () => {
+            // If user still wants listening, some browsers end early — don't force stop UI if aborted by us
+            if (_listening) {
+                // auto-restart once for Chrome intermittent stops
+                try {
+                    if (_recognition === rec) {
+                        rec.start();
+                        return;
+                    }
+                } catch (_) {}
+            }
+            stopVoiceInput();
+        };
+        _recognition = rec;
+        rec.start();
+    } catch (err) {
+        showToast('Could not start microphone: ' + (err && err.message ? err.message : err), 'error');
+        stopVoiceInput();
+    }
+}
+
+
+function stopVoiceInput() {
+    _listening = false;
+    try { if (_recognition) _recognition.stop(); } catch (_) {}
+    _recognition = null;
+    const status = document.getElementById('voiceStatus');
+    const mic = document.getElementById('micBtn');
+    if (status) status.hidden = true;
+    if (mic) mic.classList.remove('mic-active');
+}
+
+function _detectSpeechLang(text) {
+    const t = text || '';
+    // Arabic / Urdu script range
+    if (/[\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF]/.test(t)) {
+        // Prefer Urdu if common Urdu letters present
+        if (/[\u0679\u067E\u0686\u0688\u0691\u06A9\u06AF\u06BE\u06C1\u06D2]/.test(t)) return 'ur-PK';
+        return 'ur-PK'; // prefer Urdu voice for Arabic script in this app
+    }
+    // Devanagari
+    if (/[\u0900-\u097F]/.test(t)) return 'hi-IN';
+    return localStorage.getItem('vision_ai_voice_lang') || 'en-US';
+}
+
+function speakMessage(btn) {
+    if (!window.speechSynthesis) {
+        showToast('Speech not supported in this browser. Use Chrome or Edge.', 'error');
+        return;
+    }
+    // Toggle off if already speaking
+    if (window.speechSynthesis.speaking) {
+        window.speechSynthesis.cancel();
+        document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.remove('speaking'));
+        if (btn && btn.classList.contains('speaking')) {
+            btn.classList.remove('speaking');
+            return;
+        }
+    }
+
+    // Find message bubble: actual DOM uses .message-bubble
+    let bubble = null;
+    if (btn) {
+        bubble = btn.closest('.message-bubble')
+            || btn.closest('.message-row')
+            || btn.closest('.message, .ai-msg, .msg-ai, .bubble');
+    }
+    let text = '';
+    if (bubble) {
+        // Prefer markdown body only (skip buttons / badges)
+        const body = bubble.querySelector('.markdown-content')
+            || bubble.querySelector('.msg-fs-body')
+            || bubble;
+        const clone = body.cloneNode(true);
+        clone.querySelectorAll('button, .msg-actions, .msg-action-btn, .speak-btn, .model-used, script, style').forEach(n => n.remove());
+        text = (clone.innerText || clone.textContent || '').trim();
+        // Strip common UI chrome
+        text = text.replace(/^\s*(Copy|Speak|Height|Width|Full|Narrow|Collapse)\s*/gim, '').trim();
+    }
+    if (!text) {
+        // Last resort: any text in the row
+        const row = btn && btn.closest('.message-row');
+        if (row) text = (row.innerText || '').replace(/Copy|Speak|Height|Width|Full/g, '').trim();
+    }
+    if (!text) {
+        showToast('Nothing to read — no message text found', 'info');
+        return;
+    }
+
+    // Chrome: voices often empty until loaded
+    const voices = window.speechSynthesis.getVoices() || [];
+    const lang = _detectSpeechLang(text);
+    const u = new SpeechSynthesisUtterance(text.slice(0, 12000));
+    u.lang = lang;
+    u.rate = 0.95;
+    u.pitch = 1;
+    const match = voices.find(v => v.lang === lang)
+        || voices.find(v => (v.lang || '').toLowerCase().startsWith((lang || 'en').split('-')[0]))
+        || voices.find(v => /urdu/i.test(v.name || ''))
+        || voices.find(v => (v.lang || '').toLowerCase().startsWith('ar'))
+        || voices.find(v => /arabic|hindi/i.test(v.name || ''))
+        || voices[0];
+    if (match) u.voice = match;
+    if (/^ur/i.test(lang) && !match) {
+        showToast('No Urdu voice installed — using default voice. Add Urdu in Windows language settings for better audio.', 'info', 5000);
+    }
+
+    u.onstart = () => { if (btn) btn.classList.add('speaking'); };
+    u.onend = () => { if (btn) btn.classList.remove('speaking'); };
+    u.onerror = (e) => {
+        console.warn('speak error', e);
+        if (btn) btn.classList.remove('speaking');
+        showToast('Speak failed: ' + (e.error || 'unknown'), 'error');
+    };
+
+    // Cancel any queue then speak (Chrome quirk)
+    window.speechSynthesis.cancel();
+    setTimeout(() => window.speechSynthesis.speak(u), 50);
+}
+
+
+function stopSpeaking() {
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    document.querySelectorAll('.speak-btn.speaking').forEach(b => b.classList.remove('speaking'));
+}
+
+window.fillPrompt = fillPrompt;
+window.toggleVoiceInput = toggleVoiceInput;
+window.startVoiceInput = startVoiceInput;
+window.stopVoiceInput = stopVoiceInput;
+window.speakMessage = speakMessage;
+window.stopSpeaking = stopSpeaking;
+
 window.sendMessage = sendMessage;
 window.renderUserProfile = renderUserProfile;
 window.toggleProfileDropdown = toggleProfileDropdown;
@@ -1641,3 +1950,8 @@ window.filterByTag = filterByTag;
 window.renderTagChips = renderTagChips;
 
 console.log('👁️ Vision AI v2.0 - Ready');
+// Prefetch voices for Urdu/Arabic TTS
+if (typeof window !== 'undefined' && window.speechSynthesis) {
+    window.speechSynthesis.onvoiceschanged = function() { window.speechSynthesis.getVoices(); };
+    try { window.speechSynthesis.getVoices(); } catch (_) {}
+}

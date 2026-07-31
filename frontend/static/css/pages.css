@@ -1171,3 +1171,37 @@ html {
     object-fit: contain;
     border-radius: 6px;
 }
+
+
+/* ===== Glass consistency (dark + light) ===== */
+.glass, .glass-card, .login-card, .auth-card, .plan-card, .settings-card,
+.page-hero, .current-plan-banner, .payment-section {
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+}
+[data-theme="light"] {
+  --glass-bg: rgba(255, 255, 255, 0.82);
+  --glass-border: rgba(15, 23, 42, 0.08);
+  --topbar-bg: rgba(255, 255, 255, 0.9);
+}
+[data-theme="dark"] {
+  --glass-bg: rgba(18, 18, 32, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --topbar-bg: rgba(12, 12, 22, 0.85);
+}
+[data-theme="light"] .glass-card,
+[data-theme="light"] .login-card,
+[data-theme="light"] .plan-card,
+[data-theme="light"] .payment-section {
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 8px 32px rgba(15, 23, 42, 0.08);
+}
+[data-theme="dark"] .glass-card,
+[data-theme="dark"] .login-card,
+[data-theme="dark"] .plan-card,
+[data-theme="dark"] .payment-section {
+  background: var(--glass-bg) !important;
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+}

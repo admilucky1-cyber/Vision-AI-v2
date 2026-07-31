@@ -27,11 +27,29 @@ import shutil
 load_dotenv()
 
 def _ytdlp_ok() -> bool:
-    import shutil
-    return shutil.which("yt-dlp") is not None
+    if shutil.which("yt-dlp"):
+        return True
+    try:
+        import yt_dlp  # noqa: F401
+        return True
+    except Exception:
+        return False
 
 YT_DLP_AVAILABLE = True  # resolved at call time via _ytdlp_ok()
 logger = logging.getLogger("vision-ai.youtube")
+
+
+def _ytdlp_cmd() -> list:
+    """
+    Prefer system `yt-dlp` binary; fall back to `python -m yt_dlp`
+    (works on Railway/Render when only the pip package is installed).
+    """
+    import sys
+    if shutil.which("yt-dlp"):
+        return ["yt-dlp"]
+    return [sys.executable, "-m", "yt_dlp"]
+
+
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 API_BASE = "https://www.googleapis.com/youtube/v3"
@@ -189,7 +207,7 @@ def _info_via_ytdlp_sync(url: str) -> Dict[str, Any]:
     try:
         r = subprocess.run(
             [
-                "yt-dlp",
+                *_ytdlp_cmd(),
                 "--skip-download",
                 "--dump-single-json",
                 "--no-warnings",
@@ -388,7 +406,7 @@ def _transcript_via_ytdlp(video_id: str, with_timestamps: bool = False, language
             outtmpl = str(Path(tmp) / "subs")
             subprocess.run(
                 [
-                    "yt-dlp",
+                    *_ytdlp_cmd(),
                     "--skip-download",
                     "--write-auto-sub",
                     "--write-sub",
@@ -561,26 +579,24 @@ async def get_video_context(url: str, max_transcript_chars: int = 25000) -> Dict
 
 def _resolve_cookies_file() -> Optional[str]:
     """Return path to a Netscape cookies.txt if configured, else None."""
-    # 1. Environment variable (highest priority)
     env_cookies = (os.getenv("YTDLP_COOKIES") or os.getenv("YOUTUBE_COOKIES") or "").strip()
-    if env_cookies and Path(env_cookies).is_file() and Path(env_cookies).stat().st_size > 0:
-        logger.info(f"Using cookies file from env: {env_cookies}")
-        return env_cookies
+    if env_cookies:
+        # Relative paths resolve from project root / cwd (Railway: /app)
+        cand = Path(env_cookies)
+        if not cand.is_file():
+            cand = Path.cwd() / env_cookies
+        if not cand.is_file():
+            cand = Path(__file__).resolve().parent.parent / env_cookies
+        if cand.is_file() and cand.stat().st_size > 0:
+            logger.info(f"Using cookies file: {cand}")
+            return str(cand)
+        logger.warning(f"YTDLP_COOKIES set but file not found: {env_cookies}")
 
-    # 2. Railway's absolute path (cookies.txt is in the repo root, mounted at /app)
-    railway_cookie = Path("/app/cookies.txt")
-    if railway_cookie.is_file() and railway_cookie.stat().st_size > 0:
-        logger.info("Using cookies file: /app/cookies.txt")
-        return str(railway_cookie)
-
-    # 3. Local development (BASE_DIR = project root)
     for name in ("cookies.txt", "cookies.txt.txt"):
         static = BASE_DIR / name
         if static.is_file() and static.stat().st_size > 0:
             logger.info(f"Using static cookies: {name}")
             return str(static)
-
-    logger.warning("No valid cookies.txt found — downloads may be blocked for restricted videos.")
     return None
 
 
@@ -833,6 +849,140 @@ def _build_format_selector(
 
 
 
+
+async def list_direct_download_options(url: str, max_video: int = 8, max_audio: int = 6) -> Dict[str, Any]:
+    """
+    List best video/audio formats with *direct CDN URLs* for IDM/FDM/browser.
+    Does NOT store files on the server.
+    """
+    def _dump():
+        args = [
+            *_ytdlp_cmd(),
+            "--skip-download",
+            "--dump-single-json",
+            "--no-warnings",
+            "--no-playlist",
+            "--extractor-args", "youtube:player_client=android,ios,web,tv_embedded",
+            url,
+        ]
+        cpath = _resolve_cookies_file() if "_resolve_cookies_file" in dir() else None
+        try:
+            cpath = _resolve_cookies_file()
+        except Exception:
+            cpath = None
+        if cpath:
+            args[1:1] = ["--cookies", cpath]  # after cmd
+            # rebuild properly
+            args = [
+                *_ytdlp_cmd(),
+                "--cookies", cpath,
+                "--skip-download",
+                "--dump-single-json",
+                "--no-warnings",
+                "--no-playlist",
+                "--extractor-args", "youtube:player_client=android,ios,web,tv_embedded",
+                url,
+            ]
+        return subprocess.run(args, capture_output=True, text=True, timeout=90)
+
+    try:
+        r = await asyncio.to_thread(_dump)
+        if r.returncode != 0 or not (r.stdout or "").strip():
+            err = (r.stderr or r.stdout or "yt-dlp failed")[-400:]
+            return {"status": "error", "error": err, "mode": "direct"}
+        data = json.loads(r.stdout)
+        title = data.get("title") or "Video"
+        formats = data.get("formats") or []
+
+        video_opts = []
+        audio_opts = []
+        seen_v = set()
+        seen_a = set()
+
+        # Prefer progressive http(s) streams for single-file IDM downloads
+        for fmt in sorted(formats, key=lambda f: (f.get("height") or 0, f.get("tbr") or 0), reverse=True):
+            u = fmt.get("url")
+            if not u or not str(u).startswith("http"):
+                continue
+            proto = (fmt.get("protocol") or "")
+            if "m3u8" in proto or "dash" in proto:
+                continue  # skip adaptive playlists for simple IDM one-click
+            height = fmt.get("height")
+            acodec = fmt.get("acodec") or "none"
+            vcodec = fmt.get("vcodec") or "none"
+            ext = fmt.get("ext") or "mp4"
+            fs = fmt.get("filesize") or fmt.get("filesize_approx")
+            size_mb = round(fs / (1024 * 1024), 1) if fs else None
+            abr = fmt.get("abr")
+
+            if vcodec != "none" and height:
+                key = (height, ext)
+                if key in seen_v:
+                    continue
+                # Prefer streams that include audio (progressive)
+                has_audio = acodec != "none"
+                if not has_audio and height > 720:
+                    continue  # skip video-only high res for one-click (needs merge)
+                seen_v.add(key)
+                video_opts.append({
+                    "label": f"{height}p {ext.upper()}" + (" + audio" if has_audio else " (video only)"),
+                    "height": height,
+                    "ext": ext,
+                    "url": u,
+                    "size_mb": size_mb,
+                    "format_id": fmt.get("format_id"),
+                    "has_audio": has_audio,
+                })
+                if len(video_opts) >= max_video:
+                    break
+
+        for fmt in sorted(formats, key=lambda f: (f.get("abr") or 0), reverse=True):
+            u = fmt.get("url")
+            if not u or not str(u).startswith("http"):
+                continue
+            acodec = fmt.get("acodec") or "none"
+            vcodec = fmt.get("vcodec") or "none"
+            if acodec == "none" or (vcodec and vcodec != "none"):
+                continue
+            ext = fmt.get("ext") or "m4a"
+            abr = int(fmt.get("abr") or 0)
+            key = (ext, abr // 16)
+            if key in seen_a:
+                continue
+            seen_a.add(key)
+            fs = fmt.get("filesize") or fmt.get("filesize_approx")
+            size_mb = round(fs / (1024 * 1024), 1) if fs else None
+            audio_opts.append({
+                "label": f"{ext.upper()} ~{abr}kbps" if abr else ext.upper(),
+                "ext": ext,
+                "abr": abr,
+                "url": u,
+                "size_mb": size_mb,
+                "format_id": fmt.get("format_id"),
+            })
+            if len(audio_opts) >= max_audio:
+                break
+
+        return {
+            "status": "success",
+            "mode": "direct",
+            "title": title,
+            "video_id": data.get("id"),
+            "video": video_opts,
+            "audio": audio_opts,
+            "note": (
+                "Links open/download in your browser or IDM/FDM. "
+                "They usually expire in a few hours. Nothing is stored on the server."
+            ),
+        }
+    except subprocess.TimeoutExpired:
+        return {"status": "error", "error": "Timed out listing formats", "mode": "direct"}
+    except Exception as e:
+        logger.exception("list_direct_download_options failed")
+        return {"status": "error", "error": str(e), "mode": "direct"}
+
+
+
 async def get_direct_media_urls(
     url: str,
     *,
@@ -887,7 +1037,7 @@ async def get_direct_media_urls(
 
     def _run_get_url(fmt_str: str, extra: list) -> subprocess.CompletedProcess:
         args = [
-            "yt-dlp",
+            *_ytdlp_cmd(),
             "-f", fmt_str,
             "-g",
             "--no-playlist",
@@ -900,7 +1050,7 @@ async def get_direct_media_urls(
 
     def _run_json(fmt_str: str, extra: list) -> dict:
         args = [
-            "yt-dlp",
+            *_ytdlp_cmd(),
             "-f", fmt_str,
             "-j",
             "--no-playlist",
@@ -1055,7 +1205,7 @@ async def download_video(
 
     def _build_args(use_cookies: bool = False, use_browser: bool = False) -> list:
         a = [
-            "yt-dlp",
+            *_ytdlp_cmd(),
             "-f", fmt,
             "-o", outtmpl,
             "--no-playlist",
@@ -1071,16 +1221,9 @@ async def download_video(
             *extra,
         ]
         if use_cookies:
-            # --- HARDCODED RAILWAY PATH FIX ---
-            railway_cookie = "/app/cookies.txt"
-            if os.path.exists(railway_cookie):
-                a.extend(["--cookies", railway_cookie])
-                logger.info(f"Force-using cookies: {railway_cookie}")
-            else:
-                # Fallback to the normal resolver
-                cpath = _resolve_cookies_file()
-                if cpath:
-                    a.extend(["--cookies", cpath])
+            cpath = _resolve_cookies_file()
+            if cpath:
+                a.extend(["--cookies", cpath])
         if use_browser:
             browser = _browser_cookies_allowed()
             if browser:
@@ -1214,7 +1357,7 @@ async def estimate_download_size(
         r = await asyncio.to_thread(
             subprocess.run,
             [
-                "yt-dlp",
+                *_ytdlp_cmd(),
                 "--skip-download",
                 "--dump-single-json",
                 "--no-warnings",
@@ -1271,7 +1414,7 @@ __all__ = [
     "get_video_transcript_detailed",
     "get_video_context",
     "extract_video_id",
-    "download_video", "get_direct_media_urls",
+    "download_video", "get_direct_media_urls", "list_direct_download_options",
     "estimate_download_size",
     "get_download_history",
     "VIDEO_FORMATS",
