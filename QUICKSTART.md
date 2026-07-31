@@ -95,3 +95,15 @@ docker compose up --build -d
 ## Do not commit
 
 .env, cookies.txt, venv/, data/users.json, downloads/
+
+
+## YouTube downloads (important)
+
+Use normal download commands — files are saved on **your app domain** and open in the browser:
+
+```
+download video 720p https://youtu.be/VIDEO_ID
+download audio mp3 https://youtu.be/VIDEO_ID
+```
+
+Do **not** rely on googlevideo.com direct links (they return 403 in browsers).

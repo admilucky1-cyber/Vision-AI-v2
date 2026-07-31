@@ -979,7 +979,8 @@ const PROMPT_LIBRARY = {
             { title: "Urdu quiz from video", t: "اس یوٹیوب ویڈیو پر 10 سوالوں کا کوئز بنائیں — ہر سوال کے ساتھ درست جواب اور 1–2 سطری وضاحت۔\nلنک: [paste link]", tags: ["youtube","quiz"] },
             { title: "English summary + timeline", t: "Summarize this YouTube video with timestamps and key takeaways.\nURL: [paste link]", tags: ["youtube"] },
             { title: "List download formats", t: "List all available download formats (video + audio) with quality for: [paste YouTube URL]", tags: ["download"] },
-            { title: "Download MP3", t: "Download audio (MP3, best quality) from: [paste YouTube URL]", tags: ["download"] },
+            { title: "Download MP3", t: "Download audio MP3 from: [paste YouTube URL]", tags: ["download"] },
+            { title: "Download video (works in browser)", t: "Download video 720p from: [paste YouTube URL]", tags: ["download"] },
             { title: "Teach from transcript", t: "Extract transcript then teach me as a short lesson with examples and a 5-question mini-test.\nURL: [paste link]", tags: ["youtube"] }
         ]
     },

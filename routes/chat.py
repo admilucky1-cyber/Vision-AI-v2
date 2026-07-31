@@ -245,12 +245,14 @@ async def chat_send(
 
 
             if wants_download:
-                # Prefer DIRECT CDN links (browser / IDM / FDM). Server storage only if asked.
-                force_server = any(
+                # DEFAULT: server-side download → link on OUR domain (works in browser).
+                # Direct googlevideo.com URLs almost always 403 in browsers (IP/cookie bound).
+                # User can still ask: "direct links only" for advanced/IDM experiments.
+                want_direct_only = any(
                     p in msg_l
                     for p in (
-                        "server download", "save on server", "permanent link",
-                        "host file", "store on server",
+                        "direct link", "direct links", "cdn only", "direct only",
+                        "googlevideo", "no server", "without server",
                     )
                 )
                 height = 720
@@ -270,97 +272,49 @@ async def chat_send(
                 )
 
                 answer = None
-                if not force_server:
+
+                if want_direct_only:
                     try:
                         from services.youtube import list_direct_download_options
-                    except ImportError:
-                        list_direct_download_options = None
-                    if list_direct_download_options:
-                        try:
-                            opts = await list_direct_download_options(youtube_url)
-                        except Exception as e:
-                            logger.warning(f"list_direct failed: {e}")
-                            opts = {"status": "error", "error": str(e)}
-                        if opts.get("status") == "success":
-                            title = opts.get("title") or "Video"
-                            videos = opts.get("video") or []
-                            audios = opts.get("audio") or []
-
-                            def _row(label, size_mb, url, badge=""):
-                                size = f" · ~{size_mb} MB" if size_mb else ""
-                                b = f" `{badge}`" if badge else ""
-                                return f"1. [**{label}**{size}]({url}){b}"
-
-                            lines = [
-                                f"### ⬇️ {title}",
-                                "",
-                                "Pick a quality → **click** (browser) or **right-click → IDM/FDM**.",
-                                "Nothing stored on this server. Links expire in a few hours.",
-                                "",
-                            ]
-                            if audio_only:
-                                if audios:
-                                    lines.append("**Audio**")
-                                    for a in audios:
-                                        lines.append(_row(a["label"], a.get("size_mb"), a["url"], "audio"))
-                                    lines.append("")
-                                if videos:
-                                    lines.append("**Video** (optional)")
-                                    for v in videos[:6]:
-                                        badge = "ready" if v.get("has_audio") else "video-only"
-                                        lines.append(_row(v["label"], v.get("size_mb"), v["url"], badge))
-                            else:
-                                if videos:
-                                    lines.append("**Video**")
-                                    for v in videos:
-                                        badge = "ready" if v.get("has_audio") else "video-only"
-                                        lines.append(_row(v["label"], v.get("size_mb"), v["url"], badge))
-                                    lines.append("")
-                                if audios:
-                                    lines.append("**Audio**")
-                                    for a in audios:
-                                        lines.append(_row(a["label"], a.get("size_mb"), a["url"], "audio"))
-                            if not videos and not audios:
-                                lines.append("_No direct progressive streams found._")
-                                lines.append("Try: `server download 720p <url>`")
-                            else:
-                                lines.extend([
-                                    "",
-                                    "**How to use**",
-                                    "- Browser: click the link",
-                                    "- IDM / FDM: right-click link → Download with…",
-                                    "- Prefer `ready` over `video-only`",
-                                    "",
-                                    "_Server copy only if needed:_ `server download 720p <url>`",
-                                ])
-                            answer = "\n".join(lines)
-
-                if answer is None and force_server:
-                    try:
-                        from services.youtube import download_video
-                        result = await download_video(
-                            youtube_url,
-                            height=height,
-                            audio_only=audio_only,
-                            quality=f"{height}p",
-                        )
-                        if result.get("status") == "success":
-                            base = str(request.base_url).rstrip("/")
-                            link = f"{base}/upload/downloads/{result['filename']}"
-                            answer = (
-                                f"✅ **Server file ready** (temporary storage)\n\n"
-                                f"- **File:** `{result['filename']}`\n"
-                                f"- **Size:** {result.get('file_size_mb', '?')} MB\n\n"
-                                f"[⬇️ Download]({link})\n\n"
-                                f"_Prefer no server storage? Ask without the words `server download`._"
-                            )
-                        else:
-                            answer = f"❌ Server download failed: {result.get('error', 'unknown')}"
+                        opts = await list_direct_download_options(youtube_url)
                     except Exception as e:
-                        answer = f"❌ Server download error: {e}"
+                        logger.warning(f"list_direct failed: {e}")
+                        opts = {"status": "error", "error": str(e)}
+                    if opts.get("status") == "success":
+                        title = opts.get("title") or "Video"
+                        videos = opts.get("videos") or []
+                        audios = opts.get("audios") or []
+                        lines = [
+                            f"⬇️ **{title}** — direct CDN links (often **403 in browser**)",
+                            "",
+                            "_Google binds these to the server IP. Prefer normal download for a working link._",
+                            "",
+                        ]
+                        def _row(label, size_mb, url, kind):
+                            size = f" · ~{size_mb} MB" if size_mb else ""
+                            return f"1. [{label}{size}]({url})"
+                        if videos:
+                            lines.append("**Video**")
+                            for i, v in enumerate(videos, 1):
+                                lines.append(f"{i}. [{v['label']}" + (f" · ~{v.get('size_mb')} MB" if v.get('size_mb') else "") + f"]({v['url']})")
+                            lines.append("")
+                        if audios:
+                            lines.append("**Audio**")
+                            for i, a in enumerate(audios, 1):
+                                lines.append(f"{i}. [{a['label']}" + (f" · ~{a.get('size_mb')} MB" if a.get('size_mb') else "") + f"]({a['url']})")
+                        lines.extend([
+                            "",
+                            "For a link that opens: `download 720p <url>` (server file on this site).",
+                        ])
+                        answer = "\n".join(lines)
+                    else:
+                        answer = (
+                            "❌ Could not list direct links. "
+                            "Use normal download instead: `download 720p <url>`"
+                        )
 
                 if answer is None:
-                    # Auto-fallback to server temp download when direct CDN fails
+                    # Primary path: download on server, serve from /upload/downloads/
                     try:
                         from services.youtube import download_video
                         result = await download_video(
@@ -373,32 +327,35 @@ async def chat_send(
                             base = str(request.base_url).rstrip("/")
                             link = f"{base}/upload/downloads/{result['filename']}"
                             note = result.get("note") or ""
-                            extra = f"- **Note:** {note}\n" if note else ""
+                            kind = "Audio (MP3)" if audio_only else f"Video (~{height}p)"
                             answer = (
-                                f"✅ **Download ready** (server temp file)\n\n"
+                                f"✅ **Download ready** — {kind}\n\n"
                                 f"- **File:** `{result['filename']}`\n"
                                 f"- **Size:** {result.get('file_size_mb', '?')} MB\n"
-                                f"{extra}\n"
-                                f"[⬇️ Download file]({link})\n\n"
-                                f"_Direct CDN blocked. Add Netscape cookies.txt + YTDLP_COOKIES for direct links._"
+                                + (f"- **Note:** {note}\n" if note else "")
+                                + f"\n"
+                                f"**[⬇️ Click to download]({link})**\n\n"
+                                f"This file is on **this site** (not googlevideo). "
+                                f"Opens in browser and IDM/FDM.\n\n"
+                                f"_Temporary file — older downloads are cleaned periodically._"
                             )
                         else:
                             err = result.get("error") or "unknown"
                             answer = (
                                 f"❌ Download failed: {err}\n\n"
-                                f"**Fix:** put Netscape `cookies.txt` in project root, set "
-                                f"`YTDLP_COOKIES=cookies.txt`, restart. "
-                                f"Railway needs Dockerfile + cookies at `/app/cookies.txt`."
+                                f"**Tips:** public video only; on Railway ensure Dockerfile build "
+                                f"(ffmpeg + yt-dlp). Optional: mount `cookies.txt` if YouTube bot-checks."
                             )
                     except Exception as e:
+                        logger.exception("server download failed")
                         answer = (
-                            f"❌ Download failed: {e}\n\n"
-                            f"Need `yt-dlp`, `ffmpeg` (Docker), and optional `YTDLP_COOKIES`."
+                            f"❌ Download error: {e}\n\n"
+                            f"Need yt-dlp + ffmpeg on the server (Docker image includes them)."
                         )
 
                 return ChatResponse(
                     answer=answer,
-                    model_used="youtube-direct",
+                    model_used="youtube-download",
                     context_length=0,
                     response_time=round(time.time() - start_time, 2),
                     reasoning_style="download",
