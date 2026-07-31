@@ -561,16 +561,26 @@ async def get_video_context(url: str, max_transcript_chars: int = 25000) -> Dict
 
 def _resolve_cookies_file() -> Optional[str]:
     """Return path to a Netscape cookies.txt if configured, else None."""
+    # 1. Environment variable (highest priority)
     env_cookies = (os.getenv("YTDLP_COOKIES") or os.getenv("YOUTUBE_COOKIES") or "").strip()
     if env_cookies and Path(env_cookies).is_file() and Path(env_cookies).stat().st_size > 0:
         logger.info(f"Using cookies file from env: {env_cookies}")
         return env_cookies
 
+    # 2. Railway's absolute path (cookies.txt is in the repo root, mounted at /app)
+    railway_cookie = Path("/app/cookies.txt")
+    if railway_cookie.is_file() and railway_cookie.stat().st_size > 0:
+        logger.info("Using cookies file: /app/cookies.txt")
+        return str(railway_cookie)
+
+    # 3. Local development (BASE_DIR = project root)
     for name in ("cookies.txt", "cookies.txt.txt"):
         static = BASE_DIR / name
         if static.is_file() and static.stat().st_size > 0:
             logger.info(f"Using static cookies: {name}")
             return str(static)
+
+    logger.warning("No valid cookies.txt found — downloads may be blocked for restricted videos.")
     return None
 
 
