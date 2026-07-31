@@ -1071,9 +1071,16 @@ async def download_video(
             *extra,
         ]
         if use_cookies:
-            cpath = _resolve_cookies_file()
-            if cpath:
-                a.extend(["--cookies", cpath])
+            # --- HARDCODED RAILWAY PATH FIX ---
+            railway_cookie = "/app/cookies.txt"
+            if os.path.exists(railway_cookie):
+                a.extend(["--cookies", railway_cookie])
+                logger.info(f"Force-using cookies: {railway_cookie}")
+            else:
+                # Fallback to the normal resolver
+                cpath = _resolve_cookies_file()
+                if cpath:
+                    a.extend(["--cookies", cpath])
         if use_browser:
             browser = _browser_cookies_allowed()
             if browser:
