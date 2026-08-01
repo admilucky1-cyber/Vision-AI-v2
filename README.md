@@ -1,12 +1,9 @@
-I see you have a **merge conflict** in your `README.md` between two branches (`HEAD` and `origin/main`).  
-Here is the **fully resolved, merged, and updated `README.md`** — combining your **Vision AI v2.0** documentation with the **AI-Lab** branding, while keeping all the accurate features and deployment details intact.
 
----
 
-## ✅ Final Resolved `README.md` (Merge Completed)
+## ✅ README.md` ( Completed)
 
 ```markdown
-# AI-Lab / Vision AI v2.0
+#  Vision AI v2.0
 
 > **Production‑grade multi‑modal AI assistant with document processing, diagram generation, and real‑time web search.**  
 > *Built as part of the AI-Lab training environment.*
