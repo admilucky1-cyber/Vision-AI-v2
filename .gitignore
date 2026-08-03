@@ -1,0 +1,328 @@
+# ============================================================
+# Vision AI v2.0 - Git Ignore Rules
+# ============================================================
+
+# ============================================================
+# BYTE-COMPILED / OPTIMIZED / DLL FILES
+# ============================================================
+__pycache__/
+*.py[codz]
+*$py.class
+*.so
+
+# ============================================================
+# DISTRIBUTION / PACKAGING
+# ============================================================
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ============================================================
+# PYINSTALLER
+# ============================================================
+*.manifest
+*.spec
+
+# ============================================================
+# INSTALLER LOGS
+# ============================================================
+pip-log.txt
+pip-delete-this-directory.txt
+
+# ============================================================
+# UNIT TEST / COVERAGE REPORTS
+# ============================================================
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py.cover
+.hypothesis/
+.pytest_cache/
+cover/
+
+# ============================================================
+# TRANSLATIONS
+# ============================================================
+*.mo
+*.pot
+
+# ============================================================
+# DJANGO / FLASK / WEB FRAMEWORKS
+# ============================================================
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+instance/
+.webassets-cache
+
+# ============================================================
+# SCRAPY
+# ============================================================
+.scrapy
+
+# ============================================================
+# SPHINX DOCUMENTATION
+# ============================================================
+docs/_build/
+
+# ============================================================
+# PYBUIDER
+# ============================================================
+.pybuilder/
+target/
+
+# ============================================================
+# JUPYTER NOTEBOOK
+# ============================================================
+.ipynb_checkpoints
+
+# ============================================================
+# IPYTHON
+# ============================================================
+profile_default/
+ipython_config.py
+
+# ============================================================
+# PYENV / PIPENV / POETRY / UV / PDM / PIXI
+# ============================================================
+# pyenv
+.python-version
+
+# pipenv
+Pipfile.lock
+
+# uv
+uv.lock
+
+# poetry
+poetry.lock
+poetry.toml
+
+# pdm
+pdm.lock
+pdm.toml
+.pdm-python
+.pdm-build/
+
+# pixi
+pixi.lock
+.pixi
+
+# ============================================================
+# PEP 582 (PYFLOW / PDM)
+# ============================================================
+__pypackages__/
+
+# ============================================================
+# CELERY
+# ============================================================
+celerybeat-schedule
+celerybeat.pid
+
+# ============================================================
+# REDIS / RABBITMQ / ACTIVEMQ
+# ============================================================
+*.rdb
+*.aof
+*.pid
+mnesia/
+rabbitmq/
+rabbitmq-data/
+activemq-data/
+
+# ============================================================
+# SAGEMATH
+# ============================================================
+*.sage.py
+
+# ============================================================
+# VIRTUAL ENVIRONMENTS
+# ============================================================
+.env
+.envrc
+.env.local
+.env.production
+.env.development
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# ============================================================
+# SPYDER / ROPE / MKDOCTS / MYPY / PYRE / PYTYPE
+# ============================================================
+.spyderproject
+.spyproject
+.ropeproject
+/site
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+
+# ============================================================
+# CYTHON DEBUG SYMBOLS
+# ============================================================
+cython_debug/
+
+# ============================================================
+# PYCHARM / VS CODE / JETBRAINS
+# ============================================================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+desktop.ini
+tempCodeRunnerFile.py
+
+# ============================================================
+# ABSTRA
+# ============================================================
+.abstra/
+
+# ============================================================
+# RUFF
+# ============================================================
+.ruff_cache/
+
+# ============================================================
+# PYPI CONFIGURATION
+# ============================================================
+.pypirc
+
+# ============================================================
+# MARIMO / STREAMLIT
+# ============================================================
+marimo/_static/
+marimo/_lsp/
+__marimo__/
+.streamlit/secrets.toml
+
+# ============================================================
+# 🔥 VISION AI - APPLICATION-SPECIFIC IGNORES
+# ============================================================
+
+# 1. ENVIRONMENT VARIABLES (CRITICAL)
+.env
+.env.local
+.env.production
+.env.development
+*.env
+*.env.*
+
+# 2. UPLOADED FILES (USER DATA)
+uploads/
+uploads/**/*
+!uploads/.gitkeep
+
+# 3. VECTOR DATABASE & EMBEDDINGS
+chroma_db/
+chroma_db/**/*
+!chroma_db/.gitkeep
+
+# 4. DOWNLOADS & CACHE
+downloads/
+downloads/**/*
+!downloads/.gitkeep
+cache/
+cache/**/*
+!cache/.gitkeep
+
+# 5. LOGS
+logs/
+logs/**/*
+!logs/.gitkeep
+app.log
+*.log
+
+# 6. SEARCH & LEARNING DATABASES
+search_cache.json
+advanced_learning.json
+knowledge_graph.json
+update_history.json
+
+# 7. TEMPORARY FILES
+*.tmp
+*.temp
+*.pid
+
+# ============================================================
+# 🔥 SECURITY SAFETY NET (SENSITIVE FILES)
+# ============================================================
+
+# 8. DEPLOYMENT ARTIFACTS (DO NOT COMMIT)
+.deploy/
+.DS_Store
+*.secret
+*.pem
+*.key
+*.crt
+*.cert
+*.p12
+*.pfx
+
+# 9. BACKUP FILES (AVOID ACCIDENTAL COMMITS)
+*.bak
+*.backup
+*.old
+*.orig
+
+# 10. SYSTEM FILES (MAC / WINDOWS / LINUX)
+.DS_Store
+Thumbs.db
+desktop.ini
+*.lnk
+*.dll
+*.exe
+*.msi
+
+# ============================================================
+# 🚀 KEEP ROOT CLEAN
+# ============================================================
+*.pyc
+# Data & runtime (moved under data/)
+data/*.json
+!data/.gitkeep
+chroma_db/
+chroma_db/**/*
+!chroma_db/.gitkeep
+
+# User database
+data/users.json
+data/users.tmp
+
+data/payment_requests.json
+
+cookies.txt
+cookies.txt.txt
+*.cookies
+
+.venv/
