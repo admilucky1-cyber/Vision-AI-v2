@@ -1,0 +1,10 @@
+# Force Docker so ffmpeg + system tools exist (Nixpacks alone has no ffmpeg)
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 5

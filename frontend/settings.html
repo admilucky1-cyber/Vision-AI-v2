@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <!-- 🔥 UPDATED: Forces perfect 1:1 mobile scaling -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2d6a3e">
+    <meta name="description" content="Vision AI v2.0 - Settings & Profile Management">
+    <title>Settings - Vision AI v2.0</title>
+
+    <!-- ✅ PREMIUM FAVICONS (Matches your exact folder structure) -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/frontend/static/favicon/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/frontend/static/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/frontend/static/favicon/favicon-16x16.png">
+    <link rel="manifest" href="/frontend/static/favicon/site.webmanifest">
+    <!-- ✅ LEGACY SUPPORT (For older browsers / fallback) -->
+    <link rel="shortcut icon" href="/frontend/static/favicon/favicon.ico">
+    
+    <!-- Preconnect for faster loading -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    
+    <!-- Global Theme -->
+    <link rel="stylesheet" href="/frontend/static/css/style.css?v=200">
+    <!-- Page Layout System -->
+    <link rel="stylesheet" href="/frontend/static/css/pages.css?v=200">
+    
+    <style>
+        /* Page-Specific Styles */
+        * { 
+            box-sizing: border-box; 
+            margin: 0; 
+            padding: 0; 
+        }
+        
+        body { 
+            font-family: var(--font-family, 'Inter', system-ui, -apple-system, sans-serif); 
+            background: var(--bg-deep, #ffffff); 
+            color: var(--text-main, #1a1a1a); 
+            margin: 0;
+            padding: 0;
+        }
+
+        .page {
+            max-width: 920px; 
+            margin: 28px auto; 
+            padding: 0 20px 80px;
+        }
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            align-items: start;
+        }
+        @media (max-width: 720px) {
+            .settings-grid { grid-template-columns: 1fr; }
+        }
+        .settings-grid .card.full-width { grid-column: 1 / -1; }
+        .card {
+            margin-bottom: 0 !important;
+        }
+        .voice-box {
+            background: var(--plan-bg, rgba(45,106,62,0.08));
+            border: 1px solid var(--plan-border, rgba(45,106,62,0.22));
+            border-radius: 14px;
+            padding: 16px 18px;
+            margin-top: 8px;
+        }
+        .voice-box label { font-size: 13px; color: var(--text-muted); display:block; margin-bottom: 6px; }
+        .voice-box select {
+            width: 100%; padding: 10px 12px; border-radius: 10px;
+            border: 1px solid var(--border-color); background: var(--input-bg);
+            color: var(--text-main); margin-bottom: 10px;
+        }
+        
+        h1 { 
+            font-size: 26px; 
+            font-weight: 800; 
+            margin-bottom: 6px; 
+        }
+        
+        .subtitle { 
+            color: var(--text-muted, #6b7280); 
+            font-size: 14px; 
+            margin-bottom: 30px; 
+        }
+
+        .card {
+            background: var(--bg-secondary, #ffffff);
+            border: 1px solid var(--border-color, #e5e7eb);
+            border-radius: 16px;
+            padding: 20px 22px;
+            margin-bottom: 16px;
+            transition: background 0.3s ease, border 0.3s ease;
+        }
+        
+        .card h2 { 
+            font-size: 15px; 
+            font-weight: 700; 
+            margin-bottom: 18px; 
+            display: flex; 
+            align-items: center; 
+            gap: 8px; 
+        }
+
+        .profile-row {
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center;
+            padding: 11px 0; 
+            border-bottom: 1px solid var(--border-color, #e5e7eb); 
+            font-size: 14px;
+            transition: border 0.3s ease;
+        }
+        
+        .profile-row:last-child { 
+            border-bottom: none; 
+        }
+        
+        .profile-row .label { 
+            color: var(--text-muted, #6b7280); 
+        }
+        
+        .profile-row .value { 
+            color: var(--text-main, #1a1a1a); 
+            font-weight: 500; 
+            display: flex; 
+            align-items: center; 
+            gap: 10px; 
+        }
+        
+        .plan-badge {
+            display: inline-block; 
+            padding: 3px 12px; 
+            border-radius: 20px; 
+            font-size: 12px; 
+            font-weight: 700;
+            background: var(--plan-bg, rgba(0, 198, 255, 0.1));
+            color: #00C6FF; 
+            border: 1px solid var(--plan-border, rgba(0, 198, 255, 0.2)); 
+            text-transform: capitalize;
+        }
+
+        .form-group { 
+            margin-bottom: 16px; 
+            position: relative; 
+        }
+        
+        .form-group label { 
+            display: block; 
+            margin-bottom: 6px; 
+            font-size: 13px; 
+            font-weight: 500; 
+            color: var(--text-muted, #6b7280); 
+        }
+        
+        .form-group input {
+            width: 100%; 
+            padding: 12px 14px; 
+            padding-right: 45px;
+            background: var(--input-bg, #ffffff); 
+            border: 1px solid var(--input-border, #d1d5db);
+            border-radius: 10px; 
+            color: var(--text-main, #1a1a1a); 
+            font-size: 14px; 
+            outline: none; 
+            transition: all 0.2s;
+        }
+        
+        .form-group input:focus { 
+            border-color: #7b68ee; 
+            box-shadow: 0 0 0 3px rgba(123, 104, 238, 0.15); 
+        }
+        
+        .form-group input:invalid {
+            border-color: #ef4444;
+        }
+        
+        .form-group input:invalid:focus {
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+        }
+
+        .toggle-password {
+            position: absolute; 
+            right: 12px; 
+            top: 37px; 
+            cursor: pointer; 
+            background: none; 
+            border: none;
+            color: var(--text-muted, #6b7280); 
+            font-size: 16px;
+        }
+        
+        .toggle-password:hover { 
+            color: var(--text-main, #1a1a1a); 
+        }
+
+        .btn {
+            padding: 11px 20px; 
+            border-radius: 10px; 
+            border: none; 
+            cursor: pointer;
+            font-weight: 600; 
+            font-size: 14px; 
+            transition: all 0.2s;
+        }
+        
+        .btn-primary { 
+            background: linear-gradient(135deg, #00C6FF, #7B68EE); 
+            color: #fff; 
+        }
+        
+        .btn-primary:hover:not(:disabled) { 
+            transform: scale(1.02); 
+            box-shadow: 0 6px 16px rgba(0, 198, 255, 0.25); 
+        }
+        
+        .btn-primary:disabled { 
+            opacity: 0.6; 
+            cursor: not-allowed; 
+            transform: none; 
+        }
+        
+        .btn-outline { 
+            background: transparent; 
+            border: 1px solid var(--border-color, #e5e7eb); 
+            color: var(--text-main, #1a1a1a); 
+        }
+        
+        .btn-outline:hover { 
+            background: var(--input-bg, #ffffff); 
+        }
+
+        .btn-danger-outline { 
+            background: transparent; 
+            border: 1px solid rgba(239, 68, 68, 0.35); 
+            color: #ef4444; 
+        }
+        
+        .btn-danger-outline:hover { 
+            background: rgba(239, 68, 68, 0.08); 
+        }
+
+        .card-actions { 
+            display: flex; 
+            gap: 10px; 
+            flex-wrap: wrap; 
+            margin-top: 4px; 
+        }
+
+        .edit-icon-btn {
+            background: transparent; 
+            border: none; 
+            color: var(--text-muted, #6b7280);
+            cursor: pointer; 
+            font-size: 14px; 
+            padding: 2px 6px;
+            border-radius: 6px; 
+            transition: all 0.2s;
+        }
+        
+        .edit-icon-btn:hover { 
+            color: #00C6FF; 
+            background: var(--input-bg, #ffffff); 
+        }
+        
+        .edit-input-group { 
+            display: flex; 
+            gap: 8px; 
+            align-items: center; 
+        }
+        
+        .edit-input-group input { 
+            padding: 6px 10px; 
+            font-size: 13px; 
+            width: 180px; 
+            background: var(--input-bg, #ffffff); 
+            border: 1px solid var(--border-color, #e5e7eb); 
+            border-radius: 6px; 
+            color: var(--text-main, #1a1a1a); 
+        }
+        
+        .edit-input-group input:focus { 
+            border-color: #00C6FF; 
+            outline: none; 
+        }
+        
+        .edit-input-group button { 
+            padding: 6px 12px; 
+            font-size: 12px; 
+        }
+
+        .msg { 
+            font-size: 13px; 
+            padding: 10px 14px; 
+            border-radius: 10px; 
+            margin-top: 12px; 
+            display: none; 
+        }
+        
+        .msg.show { 
+            display: block; 
+        }
+        
+        .msg.success { 
+            background: var(--success-bg, rgba(34, 197, 94, 0.1)); 
+            color: var(--success-text, #22c55e); 
+            border: 1px solid rgba(34, 197, 94, 0.3); 
+        }
+        
+        .msg.error { 
+            background: var(--error-bg, rgba(239, 68, 68, 0.1)); 
+            color: var(--error-text, #ef4444); 
+            border: 1px solid rgba(239, 68, 68, 0.3); 
+        }
+
+        .loading-state { 
+            text-align: center; 
+            padding: 60px; 
+            color: var(--text-muted, #6b7280); 
+        }
+        
+        .spinner {
+            width: 28px; 
+            height: 28px; 
+            border: 3px solid var(--border-color, #e5e7eb); 
+            border-top-color: #00C6FF;
+            border-radius: 50%; 
+            margin: 0 auto 12px; 
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin { 
+            to { transform: rotate(360deg); } 
+        }
+
+        @media (max-width: 480px) {
+            .page { 
+                margin: 20px auto; 
+                padding: 0 16px 40px; 
+            }
+            .card { 
+                padding: 20px 16px; 
+            }
+            .profile-row { 
+                flex-direction: column; 
+                align-items: flex-start; 
+                gap: 4px; 
+                padding: 8px 0; 
+            }
+            .profile-row .value { 
+                width: 100%; 
+                justify-content: space-between; 
+            }
+            .edit-input-group { 
+                flex-wrap: wrap; 
+                width: 100%; 
+            }
+            .edit-input-group input { 
+                width: 100%; 
+            }
+            .edit-input-group button { 
+                flex: 1; 
+            }
+        }
+        
+        /* Dark mode fallbacks */
+        [data-theme="dark"] .plan-badge {
+            background: rgba(0, 198, 255, 0.15);
+            border-color: rgba(0, 198, 255, 0.3);
+        }
+    </style>
+    <link rel="stylesheet" href="/frontend/static/css/v3-ui.css?v=200">
+</head>
+<body class="page-view">
+
+<div class="page-topbar" role="banner">
+    <div class="page-brand">
+        <img src="/frontend/static/img/vision-ai-logo-64.png" alt="" class="brand-logo" width="28" height="28">
+        Vision AI
+    </div>
+    <div class="topbar-actions" style="display:flex; align-items:center; gap:12px;">
+        <!-- 🔥 FIX: Use the theme-toggle-btn class from pages.css -->
+        <button class="theme-toggle-btn" id="themeToggle" aria-label="Toggle theme">🌙</button>
+        <button class="page-back-btn" onclick="window.history.back()" aria-label="Go back">← Back</button>
+    </div>
+</div>
+
+<div class="page" role="main">
+    <h1>⚙️ Settings</h1>
+    <p class="subtitle">Manage your profile, theme, plan, and account security.</p>
+
+    <div id="content" aria-live="polite">
+        <div class="loading-state">
+            <div class="spinner"></div>
+            Loading your account…
+        </div>
+    </div>
+</div>
+
+<script src="/frontend/static/js/settings.js?v=200"></script>
+
+<script>
+    // ============================================================
+    // SETTINGS INITIALIZATION (Crash-Free)
+    // ============================================================
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        // Prevent duplicate execution
+        if (window._settingsDOMReady) return;
+        window._settingsDOMReady = true;
+
+        // Apply theme from localStorage
+        const savedTheme = localStorage.getItem('vision_ai_theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        
+        // Update theme toggle button icon
+        const themeBtn = document.getElementById('themeToggle');
+        if (themeBtn) {
+            if (savedTheme === 'light') themeBtn.textContent = '☀️';
+            else if (savedTheme === 'system') themeBtn.textContent = '💻';
+            else themeBtn.textContent = '🌙';
+            
+            themeBtn.addEventListener('click', function() {
+                const current = localStorage.getItem('vision_ai_theme') || 'dark';
+                let nextTheme;
+                if (current === 'dark') nextTheme = 'light';
+                else if (current === 'light') nextTheme = 'system';
+                else nextTheme = 'dark';
+                
+                document.documentElement.setAttribute('data-theme', nextTheme);
+                localStorage.setItem('vision_ai_theme', nextTheme);
+                
+                if (nextTheme === 'light') this.textContent = '☀️';
+                else if (nextTheme === 'system') this.textContent = '💻';
+                else this.textContent = '🌙';
+            });
+        }
+        
+        console.log('👁️ Vision AI Settings - Ready');
+    });
+</script>
+</body>
+</html>
