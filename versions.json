@@ -1,0 +1,56 @@
+{
+  "current": "2.1.0",
+  "versions": [
+    {
+      "id": "2.1.0",
+      "name": "Vision AI v2.1.0 — Regenerative",
+      "tag": "v2.1.0",
+      "branch": "main",
+      "released": "2026-08-03",
+      "status": "stable",
+      "summary": "Nature theme, payment pending + Telegram/ntfy notify, speech multi-language, free deploy ready",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.0.2",
+      "name": "Vision AI v2.0.2",
+      "tag": "v2.0.2",
+      "branch": "version/2.0",
+      "released": "2026-07-29",
+      "status": "archived",
+      "summary": "Production fixes: Pydantic v2, CORS, RAG paths, greeting detection",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.0.0",
+      "name": "Vision AI v2.0.0",
+      "tag": "v2.0.0",
+      "branch": "version/2.0",
+      "released": "2026-07-28",
+      "status": "archived",
+      "summary": "Initial multi-provider LLM, RAG, JWT, diagram gen",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    }
+  ]
+}
