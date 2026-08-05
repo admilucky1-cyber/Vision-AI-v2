@@ -1,0 +1,277 @@
+{
+  "current": "2.4.8",
+  "versions": [
+    {
+      "id": "2.4.8",
+      "name": "Vision AI v2.4.8 \u2014 UI polish & chat quality",
+      "tag": "v2.4.8",
+      "branch": "main",
+      "released": "2026-08-05",
+      "status": "stable",
+      "summary": "Single Boost header button (no duplicate). Stronger response quality rules. Physics image keywords. Mic deny reset on tab focus. Chat/composer CSS polish.",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.4.7",
+      "name": "Vision AI v2.4.7 \u2014 Strict images + Kaggle Boost",
+      "tag": "v2.4.7",
+      "branch": "main",
+      "released": "2026-08-05",
+      "status": "stable",
+      "summary": "Strict image prompts. Short caption after images. Boost: Colab + Kaggle. GPU optional.",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.4.6",
+      "name": "Vision AI v2.4.6 \u2014 Free-first & stability",
+      "tag": "v2.4.6",
+      "branch": "main",
+      "released": "2026-08-05",
+      "status": "stable",
+      "summary": "Free-first LLM cascade (Groq\u2192Gemini\u2192OpenRouter :free). Storage quota fix. Payment QR. Multi-language. Educational AI diagrams. One-click Colab boost. FREE_STACK.md.",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.4.5",
+      "name": "Vision AI v2.4.5 \u2014 Storage fix & upgrade layout",
+      "tag": "v2.4.5",
+      "branch": "main",
+      "released": "2026-08-05",
+      "status": "stable",
+      "summary": "localStorage quota fix (no base64 in history). Model selector persists. Upgrade page structured layout. Settings clear history. Longer image timeouts.",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.4.4",
+      "name": "Vision AI v2.4.4 \u2014 Mic, languages, payment QR",
+      "tag": "v2.4.4",
+      "branch": "main",
+      "released": "2026-08-05",
+      "status": "stable",
+      "summary": "Mic toast spam fixed. Multi-language STT/TTS/chat preference. Easypaisa & IBAN QR codes on upgrade page.",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.4.3",
+      "name": "Vision AI v2.4.3 \u2014 Better educational diagrams",
+      "tag": "v2.4.3",
+      "branch": "main",
+      "released": "2026-08-05",
+      "status": "stable",
+      "summary": "Physics/field diagrams use Colab/HF AI instead of ASCII/box templates. Notes/PDF context fed into diagram prompts. No bad ASCII fallback for science diagrams.",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.4.2",
+      "name": "Vision AI v2.4.2 \u2014 Fast images & Boost fixes",
+      "tag": "v2.4.2",
+      "branch": "main",
+      "released": "2026-08-05",
+      "status": "stable",
+      "summary": "One-click Colab boost (uvicorn loop fix, secret health headers). Image gen prefers HF Inference API (no 7GB CPU download). Creative routing for 'draw an eagle'. Signal handler safe in Colab threads. Boost UI timeouts 2m/2.5m.",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.4.1",
+      "name": "Vision AI v2.4.1 \u2014 GPU Boost & Regenerative UI",
+      "tag": "v2.4.1",
+      "branch": "main",
+      "released": "2026-08-04",
+      "status": "stable",
+      "summary": "Added Colab GPU Boost integration (visit /boost). Live VRAM heartbeat monitoring, auto-failback to API keys, hardened deployment.",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.4.0",
+      "name": "Vision AI v2.4.0 \u2014 Permanent Free Setup",
+      "tag": "v2.4.0",
+      "branch": "main",
+      "released": "2026-08-03",
+      "status": "stable",
+      "summary": "Added permanent free hosting setup, Keep-Alive automation, and FREE_PERMANENT_SETUP.md documentation.",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.3.3",
+      "name": "Vision AI v2.3.3",
+      "tag": "v2.3.3",
+      "branch": "main",
+      "released": "2026-08-02",
+      "status": "stable",
+      "summary": "Minor hotfixes for environment variables and deployment paths.",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.3.2",
+      "name": "Vision AI v2.3.2",
+      "tag": "v2.3.2",
+      "branch": "main",
+      "released": "2026-08-01",
+      "status": "archived",
+      "summary": "UI polish and minor bug fixes.",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.3.1",
+      "name": "Vision AI v2.3.1",
+      "tag": "v2.3.1",
+      "branch": "main",
+      "released": "2026-08-01",
+      "status": "archived",
+      "summary": "Mid-release optimization for frontend and speech recognition.",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.3.0",
+      "name": "Vision AI v2.3.0",
+      "tag": "v2.3.0",
+      "branch": "main",
+      "released": "2026-07-31",
+      "status": "archived",
+      "summary": "Telegram payment notifications integrated, code cleanup.",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.1.0",
+      "name": "Vision AI v2.1.0 \u2014 Regenerative",
+      "tag": "v2.1.0",
+      "branch": "version/2.1",
+      "released": "2026-08-03",
+      "status": "archived",
+      "summary": "Nature theme, payment pending + Telegram/ntfy notify, speech multi-language, free deploy ready",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.0.2",
+      "name": "Vision AI v2.0.2",
+      "tag": "v2.0.2",
+      "branch": "version/2.0",
+      "released": "2026-07-29",
+      "status": "archived",
+      "summary": "Production fixes: Pydantic v2, CORS, RAG paths, greeting detection",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    },
+    {
+      "id": "2.0.0",
+      "name": "Vision AI v2.0.0",
+      "tag": "v2.0.0",
+      "branch": "version/2.0",
+      "released": "2026-07-28",
+      "status": "archived",
+      "summary": "Initial multi-provider LLM, RAG, JWT, diagram gen",
+      "deploy": {
+        "docker": true,
+        "railway": true,
+        "render": true,
+        "github": true,
+        "local": true
+      },
+      "entry": "main.py"
+    }
+  ]
+}
