@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GPU Boost — Vision AI</title>
+  <link rel="stylesheet" href="/frontend/static/css/style.css?v=241">
+  <link rel="stylesheet" href="/frontend/static/css/pages.css?v=241">
+  <style>
+    body.boost-page { display:block; height:auto; overflow:auto; background:var(--bg-main); color:var(--text-main); min-height:100vh; }
+    .boost-wrap { max-width:640px; margin:0 auto; padding:28px 16px 80px; }
+    .hero {
+      text-align:center; padding:32px 20px; border-radius:20px; margin:18px 0;
+      border:1px solid var(--border-color); background:var(--bg-deep);
+    }
+    .hero.online { border-color:rgba(34,160,80,.45); background:linear-gradient(180deg,rgba(34,160,80,.12),var(--bg-deep)); }
+    .hero.timeout { border-color:rgba(239,68,68,.4); background:linear-gradient(180deg,rgba(239,68,68,.1),var(--bg-deep)); }
+    .hero.stale { border-color:rgba(234,179,8,.5); background:linear-gradient(180deg,rgba(234,179,8,.12),var(--bg-deep)); }
+    .dot { width:18px; height:18px; border-radius:50%; display:inline-block; background:#94a3b8; margin-right:8px; vertical-align:middle; }
+    .hero.online .dot { background:#22c55e; animation:pulse 1.5s infinite; }
+    .hero.stale .dot { background:#eab308; }
+    .hero.timeout .dot { background:#ef4444; }
+    @keyframes pulse { 0%{box-shadow:0 0 0 0 rgba(34,197,94,.5)} 70%{box-shadow:0 0 0 12px transparent} 100%{box-shadow:0 0 0 0 transparent} }
+    h1 { font-size:1.5rem; margin:0 0 8px; }
+    .big-btn {
+      display:block; width:100%; max-width:420px; margin:16px auto; padding:18px 20px;
+      border:none; border-radius:14px; font-size:1.1rem; font-weight:800; cursor:pointer;
+      background:var(--primary-purple,#2d6a3e); color:#fff;
+    }
+    .big-btn:hover { filter:brightness(1.06); }
+    .card {
+      background:var(--bg-deep); border:1px solid var(--border-color);
+      border-radius:16px; padding:18px; margin-top:14px;
+    }
+    .muted { color:var(--text-muted); font-size:.92rem; line-height:1.5; }
+    .steps { margin:8px 0 0; padding-left:18px; }
+    .steps li { margin:8px 0; }
+    code { background:var(--bg-tertiary); padding:2px 6px; border-radius:4px; font-size:.8rem; }
+    a.back { color:var(--text-muted); text-decoration:none; font-size:.9rem; }
+    .vram-bar { height:8px; border-radius:99px; background:var(--bg-tertiary); overflow:hidden; margin-top:10px; max-width:280px; margin-left:auto; margin-right:auto; }
+    .vram-fill { height:100%; background:#22c55e; width:0%; }
+  </style>
+</head>
+<body class="boost-page">
+  <div class="boost-wrap">
+    <a class="back" href="/">← Chat</a>
+    <h1>⚡ GPU Boost</h1>
+    <p class="muted">Optional free Colab GPU. App works without this (API keys).</p>
+
+    <div id="hero" class="hero">
+      <span class="dot"></span>
+      <div id="title" style="font-size:1.25rem;font-weight:800;margin-top:8px;">Checking…</div>
+      <div id="sub" class="muted" style="margin-top:6px;"></div>
+      <div id="vramWrap" style="display:none;margin-top:8px;">
+        <div class="muted" id="vramText" style="font-size:.8rem;"></div>
+        <div class="vram-bar"><div class="vram-fill" id="vramFill"></div></div>
+      </div>
+    </div>
+
+    <button type="button" class="big-btn" id="oneClick">🚀 One-Click Boost — open Colab</button>
+    <p class="muted" style="text-align:center;">Copies your site URL · opens Colab with one-cell script</p>
+
+    <div class="card">
+      <strong>Do this once in Colab</strong>
+      <ol class="steps muted">
+        <li>Runtime → <strong>GPU (T4)</strong></li>
+        <li>Secrets (🔑): add <code>NGROK_TOKEN</code> once
+          <br><a href="https://dashboard.ngrok.com/get-started/your-authtoken" target="_blank" rel="noopener">Get free ngrok token</a>
+        </li>
+        <li>Paste &amp; run <strong>one cell</strong> (already copied when possible):</li>
+      </ol>
+      <pre id="cellCode" style="background:var(--bg-tertiary);padding:12px;border-radius:10px;overflow:auto;font-size:11px;line-height:1.35;"></pre>
+      <button type="button" class="big-btn" style="margin-top:10px;font-size:.95rem;padding:12px;" onclick="copyCell()">📋 Copy one-cell code</button>
+    </div>
+
+    <div class="card muted">
+      After the cell prints <strong>DONE</strong>, leave the tab open and return here.
+      Green = GPU on. Chat still works if Colab is offline.
+    </div>
+  </div>
+  <script>
+    const APP = location.origin;
+    const COLAB_NEW = 'https://colab.research.google.com/#create=true';
+    const ONE_CELL = `# One-Click Vision AI Boost — run in Colab (GPU)
+!pip -q install -U fastapi 'uvicorn[standard]' pyngrok nest_asyncio requests
+!git clone --depth 1 https://github.com/admilucky1-cyber/Vision-AI-v2.git /content/Vision-AI 2>/dev/null || (cd /content/Vision-AI && git pull --ff-only)
+%cd /content/Vision-AI
+!python colab_one_click_boost.py
+`;
+
+    document.getElementById('cellCode').textContent = ONE_CELL;
+
+    async function copyCell() {
+      try {
+        await navigator.clipboard.writeText(ONE_CELL);
+        alert('Copied. In Colab: Runtime → GPU, then paste in a cell and Run.');
+      } catch {
+        prompt('Copy this:', ONE_CELL);
+      }
+    }
+
+    document.getElementById('oneClick').onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(ONE_CELL);
+      } catch (_) {}
+      window.open(COLAB_NEW, '_blank', 'noopener');
+      alert('Colab opened.\\n1) GPU (T4)\\n2) Add Secret NGROK_TOKEN (once)\\n3) Paste the one-cell code → Run\\n4) Leave tab open');
+    };
+
+    let had = false;
+    async function refresh() {
+      const hero = document.getElementById('hero');
+      try {
+        const r = await fetch('/api/workers?t=' + Date.now());
+        const d = await r.json();
+        const reg = d.registered || [];
+        const age = reg[0] ? (reg[0].age_sec || 9999) : 9999;
+        const ok = !!(d.live && d.live.ok);
+        const w = ((d.live && d.live.workers) || []).find(x => x.ok);
+        hero.className = 'hero';
+        if (ok && age <= 120) {
+          had = true;
+          hero.classList.add('online');
+          document.getElementById('title').textContent = 'GPU Online';
+          document.getElementById('sub').textContent = 'Worker connected — leave Colab open';
+        } else if (ok || (had && age <= 150)) {
+          had = true;
+          hero.classList.add('stale');
+          document.getElementById('title').textContent = 'GPU Slow';
+          document.getElementById('sub').textContent = 'Heartbeat delayed — Re-run one cell if it dies';
+        } else if (had) {
+          hero.classList.add('timeout');
+          document.getElementById('title').textContent = 'GPU Offline';
+          document.getElementById('sub').textContent = 'Re-run the one Colab cell';
+        } else {
+          document.getElementById('title').textContent = 'GPU Off (optional)';
+          document.getElementById('sub').textContent = 'App works on API keys — Boost only if you want GPU';
+        }
+        const vw = document.getElementById('vramWrap');
+        if (w && w.vram_total_mb) {
+          vw.style.display = 'block';
+          const pct = Math.round(100 * w.vram_used_mb / w.vram_total_mb);
+          document.getElementById('vramFill').style.width = pct + '%';
+          document.getElementById('vramText').textContent = 'VRAM ' + w.vram_used_mb + ' / ' + w.vram_total_mb + ' MB';
+        } else vw.style.display = 'none';
+      } catch (e) {
+        document.getElementById('title').textContent = 'Status error';
+        document.getElementById('sub').textContent = String(e);
+      }
+    }
+    refresh();
+    setInterval(refresh, 12000);
+  </script>
+</body>
+</html>
