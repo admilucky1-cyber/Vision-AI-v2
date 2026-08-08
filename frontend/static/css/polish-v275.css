@@ -1,0 +1,158 @@
+
+/* Vision AI v2.7.5 — global polish */
+:root {
+  --va-radius: 14px;
+  --va-gap: 12px;
+  --va-accent: #22d3ee;
+  --va-accent-2: #34d399;
+  --va-card: rgba(15, 23, 32, 0.72);
+  --va-border: rgba(148, 163, 184, 0.18);
+}
+
+/* Sidebar */
+.sidebar {
+  background: linear-gradient(180deg, #0b1220 0%, #0f172a 100%) !important;
+  border-right: 1px solid var(--va-border) !important;
+}
+.sidebar-logo { letter-spacing: 0.02em; }
+.new-chat-btn {
+  background: linear-gradient(135deg, rgba(34,211,238,0.18), rgba(52,211,153,0.12)) !important;
+  border: 1px solid rgba(34,211,238,0.35) !important;
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+}
+.cache-clear-btn {
+  border-radius: 12px !important;
+  background: rgba(239,68,68,0.08) !important;
+}
+.chat-history-item, .history-item, [data-chat-id] {
+  border-radius: 10px !important;
+  margin: 4px 8px !important;
+  transition: background 0.15s ease;
+}
+.chat-history-item:hover, .history-item:hover {
+  background: rgba(34,211,238,0.1) !important;
+}
+
+/* Header tools */
+.topbar-chip, .header-right-actions .topbar-chip {
+  border-radius: 999px !important;
+  border: 1px solid var(--va-border) !important;
+  background: rgba(15,23,42,0.65) !important;
+  backdrop-filter: blur(8px);
+  transition: transform 0.12s ease, border-color 0.12s ease;
+}
+.topbar-chip:hover {
+  border-color: rgba(34,211,238,0.5) !important;
+  transform: translateY(-1px);
+}
+.main-header, .page-topbar {
+  border-bottom: 1px solid var(--va-border) !important;
+  background: rgba(8,12,20,0.85) !important;
+  backdrop-filter: blur(12px);
+}
+
+/* Composer */
+.input-container, .composer, #message {
+  border-radius: 16px !important;
+}
+#sendBtn, .send-btn {
+  border-radius: 12px !important;
+  font-weight: 700 !important;
+}
+
+/* Plan cards */
+.plans-grid {
+  display: grid !important;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)) !important;
+  gap: 16px !important;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+.plan-card {
+  border-radius: 18px !important;
+  border: 1px solid var(--va-border) !important;
+  background: var(--va-card) !important;
+  padding: 22px 18px !important;
+  min-height: 320px;
+  display: flex;
+  flex-direction: column;
+}
+.plan-card.popular {
+  border-color: rgba(52,211,153,0.55) !important;
+  box-shadow: 0 0 0 1px rgba(52,211,153,0.25), 0 12px 40px rgba(0,0,0,0.35) !important;
+}
+.plan-price {
+  font-size: 1.65rem !important;
+  font-weight: 800 !important;
+  color: #ecfeff !important;
+  margin: 8px 0 12px !important;
+}
+.plan-price .price-currency {
+  font-size: 1rem;
+  color: #67e8f9;
+  margin-right: 4px;
+}
+.plan-price .per {
+  font-size: 0.85rem !important;
+  color: #94a3b8 !important;
+  font-weight: 500 !important;
+  margin-left: 4px;
+}
+.plan-price sup { display: none !important; } /* never show $ */
+
+.payment-section {
+  max-width: 720px !important;
+  margin: 28px auto 48px !important;
+  border-radius: 20px !important;
+  border: 1px solid rgba(52,211,153,0.25) !important;
+  box-shadow: 0 16px 48px rgba(0,0,0,0.35) !important;
+}
+.payment-section h2 {
+  font-size: 1.25rem !important;
+}
+.pay-method-row {
+  border-radius: 14px !important;
+}
+
+/* Settings cards */
+.settings-grid, .settings-page .grid, body.page-view .card {
+  border-radius: 16px !important;
+}
+#settingsPage .card, .settings-card {
+  border: 1px solid var(--va-border) !important;
+  background: var(--va-card) !important;
+}
+
+/* Boost page */
+.boost-page .card, #boostRoot .card {
+  border-radius: 16px !important;
+  border: 1px solid var(--va-border) !important;
+}
+.boost-page pre, #boostRoot pre {
+  border-radius: 12px !important;
+  background: #020617 !important;
+  border: 1px solid rgba(148,163,184,0.15);
+}
+
+/* Prompt studio overlay polish */
+#helpModal, .prompt-studio-modal {
+  backdrop-filter: blur(8px);
+}
+.prompt-card, #promptGrid > div {
+  border-radius: 14px !important;
+  border: 1px solid rgba(148,163,184,0.15) !important;
+  transition: border-color 0.15s ease, transform 0.12s ease;
+}
+.prompt-card:hover, #promptGrid > div:hover {
+  border-color: rgba(34,211,238,0.4) !important;
+  transform: translateY(-2px);
+}
+
+.unique-banner {
+  border-radius: 14px !important;
+}
+
+@media (max-width: 700px) {
+  .plans-grid { grid-template-columns: 1fr !important; padding: 0 12px; }
+}

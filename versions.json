@@ -1,0 +1,61 @@
+{
+  "current": "2.7.3",
+  "released": [
+    {
+      "id": "2.7.3",
+      "tag": "v2.7.3",
+      "date": "2026-08-08",
+      "channel": "stable",
+      "summary": "Public UI fix, guest access, security docs"
+    },
+    {
+      "id": "2.7.2",
+      "tag": "v2.7.2",
+      "date": "2026-08-08",
+      "channel": "stable",
+      "summary": "Production ready: PKR plans, free limits, monetize docs, llm.py fix retained"
+    },
+    {
+      "id": "2.7.0",
+      "tag": "v2.7.0",
+      "date": "2026-08-08",
+      "channel": "stable",
+      "summary": "RAG MiniLM re-ranker, optional Colab local Qwen, worker keep-alive ping"
+    },
+    {
+      "id": "2.6.3",
+      "tag": "v2.6.3",
+      "date": "2026-08-08",
+      "channel": "stable",
+      "summary": "Phase 1 Drive model cache + local /content copy for Colab SDXL-turbo"
+    },
+    {
+      "id": "2.6.2",
+      "tag": "v2.6.2",
+      "date": "2026-08-08",
+      "channel": "stable",
+      "summary": "Mobile overlay fix, responsive header/buttons, chat UI refresh (glass composer), free-tier bar, docs sync."
+    },
+    {
+      "id": "2.6.1",
+      "tag": "v2.6.1",
+      "date": "2026-08-08",
+      "channel": "stable",
+      "summary": "Mobile layout, chat timeouts 75s/120s, Colab env secrets, Google OAuth redirect harden."
+    },
+    {
+      "id": "2.6.0",
+      "tag": "v2.6.0",
+      "date": "2026-08-07",
+      "channel": "stable",
+      "summary": "GPU-first image gen, APP_VERSION, colab_workers in /health, production FINAL baseline."
+    },
+    {
+      "id": "2.5.5",
+      "tag": "v2.5.5",
+      "date": "2026-08-07",
+      "channel": "stable",
+      "summary": "Permissions-Policy mic, chat speed, exam PDF tutoring."
+    }
+  ]
+}
