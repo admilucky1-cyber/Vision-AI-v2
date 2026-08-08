@@ -1,0 +1,9 @@
+# Fallback if not using Dockerfile — installs ffmpeg for YouTube MP3/merge
+[phases.setup]
+aptPkgs = ["ffmpeg", "curl"]
+
+[phases.install]
+cmds = ["pip install -r requirements.txt", "pip install -U yt-dlp"]
+
+[start]
+cmd = "uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1 --proxy-headers --forwarded-allow-ips=*"
