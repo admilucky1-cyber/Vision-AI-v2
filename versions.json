@@ -1,0 +1,19 @@
+{
+  "current": "2.6.0",
+  "released": [
+    {
+      "id": "2.6.0",
+      "tag": "v2.6.0",
+      "date": "2026-08-07",
+      "channel": "stable",
+      "summary": "v2.6.0 FINAL: GPU-first image gen (no Railway timeout on serverless), stronger architecture/mosque prompts, 5-min image UI timeout, unified version constant, richer /health, LLM cascade reliability, YouTube server-download default, Prompt Studio + topbar tools, Colab boost integration, production docs."
+    },
+    {
+      "id": "2.5.5",
+      "tag": "v2.5.5",
+      "date": "2026-08-07",
+      "channel": "stable",
+      "summary": "Permissions-Policy mic fix, chat latency, exam PDF tutoring, settings layout."
+    }
+  ]
+}
