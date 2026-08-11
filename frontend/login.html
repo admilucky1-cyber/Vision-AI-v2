@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-theme-preset="humanly">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a1f18">
+  <title>Sign in — Vision AI</title>
+  <link rel="icon" type="image/png" href="/frontend/static/img/vision-ai-logo-64.png">
+  <link rel="stylesheet" href="/frontend/static/css/unified-v286.css?v=287">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px 16px;
+      font-family: Inter, "Segoe UI", system-ui, sans-serif;
+      color: #e8f5f0;
+      background:
+        radial-gradient(900px 500px at 20% 10%, rgba(45,212,191,0.16), transparent 55%),
+        radial-gradient(700px 400px at 90% 90%, rgba(16,185,129,0.12), transparent 50%),
+        linear-gradient(165deg, #06140f 0%, #0a1c16 50%, #071210 100%);
+    }
+    .card {
+      width: min(420px, 100%);
+      padding: 36px 28px 28px;
+      border-radius: 24px;
+      background: linear-gradient(165deg, rgba(12, 40, 34, 0.92), rgba(8, 28, 24, 0.95));
+      border: 1px solid rgba(52, 211, 153, 0.22);
+      box-shadow: 0 24px 64px rgba(0,0,0,0.45), 0 0 40px rgba(45,212,191,0.08);
+      backdrop-filter: blur(20px);
+    }
+    .brand {
+      text-align: center;
+      margin-bottom: 22px;
+    }
+    .brand img {
+      width: 64px; height: 64px;
+      border-radius: 14px;
+      margin-bottom: 12px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    }
+    .brand h1 {
+      font-size: 1.65rem;
+      font-weight: 800;
+      color: #5eead4;
+      letter-spacing: -0.02em;
+    }
+    .brand p { color: #8fb9a8; font-size: 0.92rem; margin-top: 4px; }
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin: 18px 0 20px;
+      padding: 4px;
+      border-radius: 14px;
+      background: rgba(0,0,0,0.25);
+    }
+    .tabs button {
+      border: none;
+      border-radius: 10px;
+      padding: 10px;
+      font-weight: 700;
+      cursor: pointer;
+      background: transparent;
+      color: #9ab5aa;
+      font-size: 0.95rem;
+    }
+    .tabs button.active {
+      background: linear-gradient(135deg, #0d9488, #059669);
+      color: #ecfdf5;
+      box-shadow: 0 6px 16px rgba(5,150,105,0.3);
+    }
+    label {
+      display: block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: #a7c4b8;
+      margin: 12px 0 6px;
+    }
+    .field {
+      position: relative;
+    }
+    input[type="text"], input[type="password"], input[type="email"] {
+      width: 100%;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1.5px solid rgba(52,211,153,0.35);
+      background: #f0fdf9;
+      color: #0f1f1a;
+      font-size: 1rem;
+      outline: none;
+    }
+    input:focus {
+      border-color: #34d399;
+      box-shadow: 0 0 0 3px rgba(52,211,153,0.2);
+    }
+    .toggle-eye {
+      position: absolute;
+      right: 10px; top: 50%;
+      transform: translateY(-50%);
+      border: none; background: transparent;
+      cursor: pointer; font-size: 1rem;
+      color: #64748b;
+    }
+    .primary {
+      width: 100%;
+      margin-top: 20px;
+      padding: 13px;
+      border: none;
+      border-radius: 12px;
+      font-weight: 800;
+      font-size: 1rem;
+      cursor: pointer;
+      color: #042f2e;
+      background: linear-gradient(135deg, #34d399, #10b981);
+      box-shadow: 0 10px 28px rgba(16,185,129,0.35);
+    }
+    .primary:hover { filter: brightness(1.05); }
+    .divider {
+      display: flex; align-items: center; gap: 12px;
+      margin: 18px 0;
+      color: #6b8f80; font-size: 0.8rem;
+    }
+    .divider::before, .divider::after {
+      content: ""; flex: 1; height: 1px;
+      background: rgba(148,163,184,0.25);
+    }
+    .google {
+      width: 100%;
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid rgba(148,163,184,0.25);
+      background: #121a24;
+      color: #e2e8f0;
+      font-weight: 700;
+      cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .google:hover { background: #1a2433; }
+    .guest {
+      display: block;
+      text-align: center;
+      margin-top: 16px;
+      color: #5eead4;
+      font-size: 0.9rem;
+      text-decoration: none;
+      font-weight: 600;
+    }
+    .msg {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      text-align: center;
+      min-height: 1.2em;
+    }
+    .msg.err { color: #fca5a5; }
+    .msg.ok { color: #6ee7b7; }
+    .hidden { display: none !important; }
+  </style>
+  <link rel="stylesheet" href="/frontend/static/css/polish-v289.css?v=300">
+  <link rel="stylesheet" href="/frontend/static/css/adaptive-themes-v290.css?v=300">
+  <link rel="stylesheet" href="/frontend/static/css/polish-v291.css?v=300">
+  <link rel="stylesheet" href="/frontend/static/css/theme-shell-v292.css?v=300">
+  <link rel="stylesheet" href="/frontend/static/css/unified-v300.css?v=300">
+</head>
+<body>
+  <div class="card">
+    <div class="brand">
+      <img src="/frontend/static/img/vision-ai-logo-64.png" alt="Vision AI" width="64" height="64"
+           onerror="this.src='/frontend/static/img/vision-ai-logo.png'">
+      <h1>Vision AI</h1>
+      <p>See Beyond Limits</p>
+      <p style="margin-top:6px;font-size:0.85rem;">Sign in to your account</p>
+    </div>
+
+    <div class="tabs">
+      <button type="button" class="active" id="tabLogin">Login</button>
+      <button type="button" id="tabRegister">Register</button>
+    </div>
+
+    <form id="loginForm" autocomplete="on">
+      <label for="username">Username</label>
+      <input id="username" name="username" type="text" required placeholder="username" autocomplete="username">
+
+      <label for="password">Password</label>
+      <div class="field">
+        <input id="password" name="password" type="password" required placeholder="••••••••" autocomplete="current-password">
+        <button type="button" class="toggle-eye" id="eyeBtn" title="Show password">👁</button>
+      </div>
+
+      <div id="regExtra" class="hidden">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" placeholder="you@example.com" autocomplete="email">
+        <label for="full_name">Full name</label>
+        <input id="full_name" name="full_name" type="text" placeholder="Optional">
+      </div>
+
+      <button type="submit" class="primary" id="submitBtn">Sign In</button>
+      <div class="msg" id="msg"></div>
+    </form>
+
+    <div class="divider">OR</div>
+    <button type="button" class="google" id="googleBtn">
+      <span>G</span> Continue with Google
+    </button>
+    <a class="guest" href="/">Continue as guest →</a>
+  </div>
+
+  <script>
+  (function() {
+    var mode = "login";
+    var tabLogin = document.getElementById("tabLogin");
+    var tabRegister = document.getElementById("tabRegister");
+    var regExtra = document.getElementById("regExtra");
+    var submitBtn = document.getElementById("submitBtn");
+    var msg = document.getElementById("msg");
+    var form = document.getElementById("loginForm");
+
+    function setMode(m) {
+      mode = m;
+      tabLogin.classList.toggle("active", m === "login");
+      tabRegister.classList.toggle("active", m === "register");
+      regExtra.classList.toggle("hidden", m !== "register");
+      submitBtn.textContent = m === "login" ? "Sign In" : "Create account";
+      msg.textContent = "";
+    }
+    tabLogin.onclick = function() { setMode("login"); };
+    tabRegister.onclick = function() { setMode("register"); };
+
+    document.getElementById("eyeBtn").onclick = function() {
+      var p = document.getElementById("password");
+      p.type = p.type === "password" ? "text" : "password";
+    };
+
+    form.addEventListener("submit", async function(e) {
+      e.preventDefault();
+      msg.className = "msg";
+      msg.textContent = "Please wait…";
+      var username = document.getElementById("username").value.trim();
+      var password = document.getElementById("password").value;
+      var body = { username: username, password: password };
+      if (mode === "register") {
+        body.email = document.getElementById("email").value.trim();
+        body.full_name = document.getElementById("full_name").value.trim();
+      }
+      var url = mode === "login" ? "/auth/login" : "/auth/register";
+      // fallback paths used in some builds
+      var urls = mode === "login"
+        ? ["/auth/login", "/api/auth/login", "/login"]
+        : ["/auth/register", "/api/auth/register", "/register"];
+      try {
+        var data = null, res = null, lastErr = "";
+        for (var i = 0; i < urls.length; i++) {
+          try {
+            res = await fetch(urls[i], {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              credentials: "include",
+              body: JSON.stringify(body)
+            });
+            if (res.status !== 404) break;
+          } catch (err) { lastErr = String(err); }
+        }
+        if (!res) throw new Error(lastErr || "Network error");
+        data = await res.json().catch(function() { return {}; });
+        if (!res.ok) {
+          msg.className = "msg err";
+          msg.textContent = data.detail || data.error || data.message || ("Error " + res.status);
+          return;
+        }
+        // store tokens if present
+        try {
+          if (data.access_token) localStorage.setItem("vision_ai_access", data.access_token);
+          if (data.refresh_token) localStorage.setItem("vision_ai_refresh", data.refresh_token);
+          if (data.user) localStorage.setItem("vision_ai_user", JSON.stringify(data.user));
+          else localStorage.setItem("vision_ai_user", JSON.stringify({ username: username, full_name: body.full_name || username }));
+        } catch (e) {}
+        msg.className = "msg ok";
+        msg.textContent = mode === "login" ? "Signed in — redirecting…" : "Account created — redirecting…";
+        setTimeout(function() { window.location.href = "/"; }, 500);
+      } catch (err) {
+        msg.className = "msg err";
+        msg.textContent = "Could not reach server. Try again.";
+      }
+    });
+
+    document.getElementById("googleBtn").onclick = function() {
+      window.location.href = "/auth/google/login";
+    };
+  })();
+  </script>
+</body>
+</html>
