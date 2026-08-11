@@ -1,0 +1,216 @@
+/* Vision AI v3.0.6 — production polish: themes, chat alignment, unfreeze controls */
+
+/* ========== Global theme variables: stronger light/dark difference ========== */
+html[data-theme="dark"] {
+  --bg-deep: #070b14;
+  --bg-secondary: #0c1424;
+  --text-main: #e8eef7;
+  --text-muted: #94a3b8;
+  --border-color: rgba(148, 163, 184, 0.16);
+  --accent: #22d3ee;
+  --user-bubble-bg: linear-gradient(135deg, #0e7490 0%, #4f46e5 100%);
+  --user-bubble-text: #f8fafc;
+  --ai-bubble-bg: #162033;
+  --ai-bubble-text: #e8eef7;
+  color-scheme: dark;
+}
+html[data-theme="light"] {
+  --bg-deep: #f4f7fb;
+  --bg-secondary: #ffffff;
+  --text-main: #0f172a;
+  --text-muted: #64748b;
+  --border-color: rgba(15, 23, 42, 0.1);
+  --accent: #0891b2;
+  --user-bubble-bg: linear-gradient(135deg, #0891b2 0%, #4f46e5 100%);
+  --user-bubble-text: #ffffff;
+  --ai-bubble-bg: #ffffff;
+  --ai-bubble-text: #0f172a;
+  color-scheme: light;
+}
+
+body {
+  background: var(--bg-deep) !important;
+  color: var(--text-main) !important;
+  transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* ========== Chat: user messages reliably on the RIGHT ========== */
+#chatOutput .message-row,
+.message-row {
+  display: flex !important;
+  width: 100% !important;
+  gap: 10px;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+.message-row.user {
+  flex-direction: row-reverse !important;
+  justify-content: flex-start !important;
+}
+.message-row.ai,
+.message-row.assistant,
+.message-row.system {
+  flex-direction: row !important;
+  justify-content: flex-start !important;
+}
+.message-row .message-bubble {
+  max-width: min(78%, 720px) !important;
+  flex: 0 1 auto;
+}
+.message-row.user .message-bubble {
+  background: var(--user-bubble-bg) !important;
+  color: var(--user-bubble-text) !important;
+  border: none !important;
+  border-radius: 18px 18px 6px 18px !important;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.18);
+  text-align: left;
+}
+.message-row.ai .message-bubble,
+.message-row.assistant .message-bubble {
+  background: var(--ai-bubble-bg) !important;
+  color: var(--ai-bubble-text) !important;
+  border: 1px solid var(--border-color) !important;
+  border-radius: 18px 18px 18px 6px !important;
+}
+[data-theme="light"] .message-row.ai .message-bubble {
+  box-shadow: 0 4px 18px rgba(15, 23, 42, 0.06);
+}
+
+/* ========== Unfreeze hamburger / controls ========== */
+.main-header,
+header.main-header,
+.topbar,
+.page-topbar {
+  position: relative;
+  z-index: 60 !important;
+}
+.main-header .icon-btn,
+.main-header button,
+#themePicker,
+.theme-picker {
+  position: relative;
+  z-index: 61 !important;
+  pointer-events: auto !important;
+}
+/* Overlay must never cover the top header controls */
+#sidebar-overlay,
+#sidebar-overlay.active,
+.sidebar-overlay {
+  z-index: 40 !important;
+  top: 56px !important; /* leave header clickable */
+}
+@media (max-width: 768px) {
+  #sidebar-overlay.active {
+    pointer-events: auto !important;
+  }
+  .sidebar.open-mobile {
+    z-index: 50 !important;
+  }
+  /* Hamburger always works */
+  .main-header .icon-btn[aria-label*="sidebar" i],
+  .main-header .icon-btn[title*="Sidebar" i],
+  .header-btn {
+    pointer-events: auto !important;
+    opacity: 1 !important;
+  }
+}
+/* Desktop: never trap clicks with ghost overlay */
+@media (min-width: 769px) {
+  #sidebar-overlay,
+  #sidebar-overlay.active {
+    display: none !important;
+    pointer-events: none !important;
+  }
+}
+
+/* Focus / fullscreen mode: keep header usable, no stuck body lock */
+body.focus-mode .main-header,
+html[data-focus="1"] .main-header {
+  z-index: 70 !important;
+}
+body.focus-mode #sidebar-overlay {
+  display: none !important;
+  pointer-events: none !important;
+}
+
+/* ========== Theme picker + top controls look premium ========== */
+.theme-picker-btn,
+#headerThemeBtn,
+button#themePickerBtn {
+  border-radius: 999px !important;
+  border: 1px solid var(--border-color) !important;
+  background: rgba(255,255,255,0.06) !important;
+  color: var(--text-main) !important;
+  backdrop-filter: blur(8px);
+  transition: transform 0.15s ease, background 0.2s ease, border-color 0.2s ease;
+}
+.theme-picker-btn:hover,
+#headerThemeBtn:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent) !important;
+  background: rgba(34, 211, 238, 0.12) !important;
+}
+[data-theme="light"] .theme-picker-btn,
+[data-theme="light"] #headerThemeBtn {
+  background: rgba(15, 23, 42, 0.04) !important;
+}
+
+/* ========== Upgrade / payment form polish ========== */
+#paymentForm select,
+#paymentForm input {
+  border-radius: 12px !important;
+  border: 1px solid var(--border-color) !important;
+  background: var(--bg-secondary) !important;
+  color: var(--text-main) !important;
+  padding: 10px 12px !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+#paymentForm select:focus,
+#paymentForm input:focus {
+  outline: none !important;
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.25) !important;
+}
+.plan-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease !important;
+}
+.plan-card:hover {
+  transform: translateY(-4px);
+}
+
+/* Soften system bubbles */
+.message-row.system .message-bubble {
+  max-width: 90% !important;
+  margin: 0 auto;
+  text-align: center;
+}
+
+/* ===== v3.0.6 Prompt Studio safety (never freeze main UI) ===== */
+#helpModal {
+  z-index: 10050 !important;
+}
+#helpModal[aria-hidden="true"],
+#helpModal[style*="display: none"],
+#helpModal[style*="display:none"] {
+  pointer-events: none !important;
+  visibility: hidden;
+}
+body.ps-drawer-open {
+  /* only prevent background scroll while modal open — never pointer-events:none on body */
+  overflow: hidden;
+}
+#promptStudioDrawer:not(.open) {
+  pointer-events: none !important;
+  opacity: 0 !important;
+}
+#promptStudioDrawer:not(.open) .ps-backdrop {
+  pointer-events: none !important;
+}
+/* Ensure header / composer always clickable even if a ghost overlay remains */
+.main-header,
+.input-area,
+#message,
+#sendBtn {
+  position: relative;
+  z-index: 20;
+}
