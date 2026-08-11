@@ -1,0 +1,8 @@
+name: Deploy hint
+on:
+  workflow_dispatch:
+jobs:
+  note:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "Push to main triggers Railway if connected. Manual redeploy on Railway dashboard."
