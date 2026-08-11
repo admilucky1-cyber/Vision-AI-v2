@@ -1,0 +1,47 @@
+{
+  "current": "3.0.7",
+  "released": [
+    {
+      "id": "3.0.7",
+      "tag": "v3.0.7",
+      "date": "2026-08-11",
+      "channel": "stable",
+      "summary": "Light free chat cascade; Colab-only image gen (downloaded models); no chat API keys for images"
+    },
+    {
+      "id": "3.0.5",
+      "tag": "v3.0.5",
+      "date": "2026-08-11",
+      "channel": "stable",
+      "summary": "UI polish, Student plan, global themes, hamburger fix, About version, expanded free models"
+    },
+    {
+      "id": "3.0.3",
+      "tag": "v3.0.3",
+      "date": "2026-08-11",
+      "channel": "stable",
+      "summary": "Chat container restore, composer pin, theme chip"
+    },
+    {
+      "id": "3.0.2",
+      "tag": "v3.0.2",
+      "date": "2026-08-11",
+      "channel": "stable",
+      "summary": "Mobile download + Prompt Studio"
+    },
+    {
+      "id": "3.0.1",
+      "tag": "v3.0.1",
+      "date": "2026-08-11",
+      "channel": "stable",
+      "summary": "Auth guest, agent, deploy harden"
+    },
+    {
+      "id": "3.0.0",
+      "tag": "v3.0.0",
+      "date": "2026-08-11",
+      "channel": "stable",
+      "summary": "Major UI + plans release"
+    }
+  ]
+}
