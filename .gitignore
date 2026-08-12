@@ -1,0 +1,17 @@
+.env
+.env.*
+!.env.example
+cookies.txt
+__pycache__/
+*.pyc
+.venv/
+venv/
+logs/
+uploads/
+downloads/
+cache/
+chroma_db/
+data/usage.json
+data/rag_cache/
+*.log
+.DS_Store
