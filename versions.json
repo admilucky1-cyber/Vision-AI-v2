@@ -1,0 +1,138 @@
+{
+  "current": "3.2.5",
+  "released": [
+    {
+      "id": "3.2.5",
+      "tag": "v3.2.5",
+      "date": "2026-08-12",
+      "channel": "stable",
+      "summary": "KaTeX pre-render, yt-dlp --no-config, admin-only chips, no message scrollbar"
+    },
+    {
+      "id": "3.2.4",
+      "tag": "v3.2.4",
+      "date": "2026-08-12",
+      "channel": "stable",
+      "summary": "Mobile composer, sidebar density, expanded Prompt Studio, English-for-Latin STEM, simple Urdu, RTL"
+    },
+    {
+      "id": "3.2.3",
+      "tag": "v3.2.3",
+      "date": "2026-08-12",
+      "channel": "stable",
+      "summary": "Mobile download without blob (70MB fix), multi-key API rotation, anti-hallucination language, responsive shell"
+    },
+    {
+      "id": "3.2.2",
+      "tag": "v3.2.2",
+      "date": "2026-08-12",
+      "channel": "stable",
+      "summary": "English-default language, mobile YouTube download, KaTeX math fences, responsive chat typography"
+    },
+    {
+      "id": "3.2.1",
+      "tag": "v3.2.1",
+      "date": "2026-08-12",
+      "channel": "stable",
+      "summary": "Production hardening, KaTeX math, Prompt Studio fix, version alignment across codebase"
+    },
+    {
+      "id": "3.2.0",
+      "tag": "v3.2.0",
+      "date": "2026-08-12",
+      "channel": "stable",
+      "summary": "Complete exam-solve release: rag_cache module, full smoke suite, COMPLETE.md"
+    },
+    {
+      "id": "3.1.6",
+      "tag": "v3.1.6",
+      "date": "2026-08-12",
+      "channel": "stable",
+      "summary": "Exam polish: rag_files on cache reuse, larger doc completions, document-used toast"
+    },
+    {
+      "id": "3.1.5",
+      "tag": "v3.1.5",
+      "date": "2026-08-12",
+      "channel": "stable",
+      "summary": "Long exam solve timeouts: client 5min + provider 120s for documents"
+    },
+    {
+      "id": "3.1.4",
+      "tag": "v3.1.4",
+      "date": "2026-08-12",
+      "channel": "stable",
+      "summary": "Stable client session id for RAG cache; guest IP + refresh fixes"
+    },
+    {
+      "id": "3.1.3",
+      "tag": "v3.1.3",
+      "date": "2026-08-12",
+      "channel": "stable",
+      "summary": "Disk-backed RAG cache across uvicorn workers \u2014 follow-up solve works on Railway"
+    },
+    {
+      "id": "3.1.2",
+      "tag": "v3.1.2",
+      "date": "2026-08-12",
+      "channel": "stable",
+      "summary": "Follow-up solve reuses last upload (per-user cache); exam workflow reliability"
+    },
+    {
+      "id": "3.1.1",
+      "tag": "v3.1.1",
+      "date": "2026-08-12",
+      "channel": "stable",
+      "summary": "Production polish: README/TROUBLESHOOTING/env cleanup; smoke test for exam solve path"
+    },
+    {
+      "id": "3.1.0",
+      "tag": "v3.1.0",
+      "date": "2026-08-11",
+      "channel": "stable",
+      "summary": "Fix exam PDF solve hallucination: skip top-k RAG on full-document solve; keep full paper context"
+    },
+    {
+      "id": "3.0.9",
+      "tag": "v3.0.9",
+      "date": "2026-08-11",
+      "channel": "stable",
+      "summary": "CRITICAL: guest JWT auth fixed; soft free-model fallback when Groq empty; reliable chat"
+    },
+    {
+      "id": "3.0.5",
+      "tag": "v3.0.5",
+      "date": "2026-08-11",
+      "channel": "stable",
+      "summary": "UI polish, Student plan, global themes, hamburger fix, About version, expanded free models"
+    },
+    {
+      "id": "3.0.3",
+      "tag": "v3.0.3",
+      "date": "2026-08-11",
+      "channel": "stable",
+      "summary": "Chat container restore, composer pin, theme chip"
+    },
+    {
+      "id": "3.0.2",
+      "tag": "v3.0.2",
+      "date": "2026-08-11",
+      "channel": "stable",
+      "summary": "Mobile download + Prompt Studio"
+    },
+    {
+      "id": "3.0.1",
+      "tag": "v3.0.1",
+      "date": "2026-08-11",
+      "channel": "stable",
+      "summary": "Auth guest, agent, deploy harden"
+    },
+    {
+      "id": "3.0.0",
+      "tag": "v3.0.0",
+      "date": "2026-08-11",
+      "channel": "stable",
+      "summary": "Major UI + plans release"
+    }
+  ]
+}
