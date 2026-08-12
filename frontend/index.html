@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta name="app-version" content="3.1.1">
+    <meta charset="UTF-8">
+  <script src="/frontend/static/js/theme-bootstrap.js?v=304"></script>
+  <link rel="stylesheet" href="/frontend/static/css/prod-polish-v304.css?v=306">
+
+    <!-- 🔥 Forces perfect 1:1 mobile scaling -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=5">
+    <meta name="theme-color" content="#2d6a3e">
+    <meta name="description" content="Vision AI v3.1.1 - Regenerative multi-modal AI assistant">
+    <title>Vision AI v3.1.1 — Chat</title>
+
+    <!-- ✅ PREMIUM FAVICONS (Matches your exact folder structure) -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/frontend/static/favicon/apple-touch-icon.png">
+    <link rel="icon" href="/frontend/static/favicon/favicon.ico" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="/frontend/static/favicon/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/frontend/static/favicon/favicon-16x16.png">
+    <link rel="manifest" href="/frontend/static/favicon/site.webmanifest">
+    <!-- ✅ LEGACY SUPPORT (For older browsers / fallback) -->
+    <link rel="shortcut icon" href="/frontend/static/favicon/favicon.ico">
+    
+    <!-- Markdown Parser -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" defer></script>
+    <!-- Sanitizer -->
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js" defer></script>
+    <!-- Highlight.js -->
+    <!-- highlight.js self-hosted to avoid Tracking Prevention / CDN blocks -->
+    <link rel="stylesheet" href="/frontend/static/css/hljs-atom-one-dark.css?v=306">
+    <script src="/frontend/static/js/hljs-lite.js?v=306" defer></script>
+    
+    <!-- UPDATED GLOBAL CSS PATH -->
+    <link rel="stylesheet" href="/frontend/static/css/style.css?v=303">
+    <link rel="stylesheet" href="/frontend/static/css/v3-ui.css">
+    <link rel="stylesheet" href="/frontend/static/css/ui-refresh.css?v=303">
+    
+    <!-- Preconnect for faster CDN loading -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net">
+    <link rel="preconnect" href="/">
+  <link rel="stylesheet" href="/frontend/static/css/polish-v275.css?v=303">
+  <link rel="stylesheet" href="/frontend/static/css/vision-awesome.css?v=303">
+  <link rel="stylesheet" href="/frontend/static/css/chat-ui.css?v=304">
+  <link rel="stylesheet" href="/frontend/static/css/eye-care.css?v=303">
+  <link rel="stylesheet" href="/frontend/static/css/theme-presets.css?v=303">
+  <link rel="stylesheet" href="/frontend/static/css/mobile-polish.css?v=303">
+  <link rel="stylesheet" href="/frontend/static/css/humanly-teal.css?v=303">
+  <link rel="stylesheet" href="/frontend/static/css/unified-v286.css?v=303">
+  <link rel="stylesheet" href="/frontend/static/css/prompt-studio-v286.css?v=306">
+  <link rel="stylesheet" href="/frontend/static/css/sidebar-footer-v287.css?v=303">
+  <link rel="stylesheet" href="/frontend/static/css/polish-v289.css?v=303">
+  <link rel="stylesheet" href="/frontend/static/css/adaptive-themes-v290.css?v=303">
+  <link rel="stylesheet" href="/frontend/static/css/polish-v291.css?v=303">
+  <link rel="stylesheet" href="/frontend/static/css/theme-shell-v292.css?v=303">
+  <link rel="stylesheet" href="/frontend/static/css/unified-v300.css?v=303">
+  <link rel="stylesheet" href="/frontend/static/css/layout-fix-v303.css?v=304">
+</head>
+<body>
+    <!-- Sidebar Overlay for Mobile -->
+    <div id="sidebar-overlay" onclick="closeMobileSidebar()" aria-hidden="true"></div>
+    
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer" aria-live="polite"></div>
+
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar" role="navigation" aria-label="Chat sidebar">
+        <div class="sidebar-header">
+            <a href="/" class="sidebar-logo" aria-label="Vision AI Home">
+                <span class="icon logo-mark">
+                    <img src="/frontend/static/img/vision-ai-logo-64.png" alt="VISION AI" width="36" height="36">
+                </span>
+                <span class="logo-text">Vision AI</span>
+            </a>
+            <div class="sidebar-actions">
+                <button class="icon-btn" onclick="toggleSidebar()" aria-label="Toggle sidebar">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <div id="search-bar" class="hidden">
+            <input type="text" id="history-search" placeholder="Search history..." aria-label="Search chat history">
+        </div>
+
+        <button class="new-chat-btn" onclick="startNewChat()" aria-label="Start new chat">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            <span>New chat</span>
+        </button>
+
+        <button class="cache-clear-btn" onclick="clearAllCaches()" title="Clear all caches" aria-label="Clear caches">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+            </svg>
+            <span>Clear Caches</span>
+        </button>
+
+        <div class="history-list" id="historyList" role="list" aria-label="Chat history"></div>
+
+        <div class="sidebar-footer" id="sidebarFooter">
+        <button type="button" class="sidebar-link" onclick="downloadCurrentChat()" title="Download this chat as text">⬇️ Download chat</button>
+
+            <!-- The content will be injected via JS -->
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content" role="main">
+        <header class="main-header" role="banner">
+            <!-- Left: menu + brand -->
+            <div class="header-left">
+                <button class="icon-btn header-btn" onclick="toggleSidebar()" title="Toggle Sidebar" aria-label="Toggle sidebar">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <line x1="3" y1="6" x2="21" y2="6"></line>
+                        <line x1="3" y1="12" x2="21" y2="12"></line>
+                        <line x1="3" y1="18" x2="21" y2="18"></line>
+                    </svg>
+                </button>
+                <a href="/" class="header-brand" title="Vision AI Home" aria-label="Vision AI Home">
+                    <img src="/frontend/static/img/vision-ai-logo-64.png" alt="" width="28" height="28" class="header-brand-logo">
+                    <span class="header-brand-text">Vision AI</span>
+                </a>
+                <button class="icon-btn header-btn header-search-btn" onclick="forceOpenSearch()" title="Search History" aria-label="Search history">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+                    </svg>
+                </button>
+            </div>
+
+            <h1 id="chatTitle" aria-live="polite">New Chat</h1>
+
+            <div class="theme-picker" id="themePicker">
+              <button type="button" class="theme-picker-btn" id="themePickerBtn" title="Choose theme" aria-haspopup="true" aria-expanded="false"><span class="theme-picker-ico" aria-hidden="true">🎨</span><span class="theme-picker-label">Theme</span></button>
+              <div class="theme-picker-panel" role="menu">
+                <button type="button" class="theme-swatch" data-preset="humanly" role="menuitem"><span class="dot"></span> Humanly Teal</button>
+                <button type="button" class="theme-swatch" data-preset="default" role="menuitem"><span class="dot"></span> Vision Default</button>
+                <button type="button" class="theme-swatch" data-preset="nord" role="menuitem"><span class="dot"></span> Nord</button>
+                <button type="button" class="theme-swatch" data-preset="ocean" role="menuitem"><span class="dot"></span> Ocean</button>
+                <button type="button" class="theme-swatch" data-preset="forest" role="menuitem"><span class="dot"></span> Forest</button>
+                <button type="button" class="theme-swatch" data-preset="violet" role="menuitem"><span class="dot"></span> Violet</button>
+                <button type="button" class="theme-swatch" data-preset="rose" role="menuitem"><span class="dot"></span> Rose</button>
+                <button type="button" class="theme-swatch" data-preset="midnight" role="menuitem"><span class="dot"></span> Midnight</button>
+                <button type="button" class="theme-swatch" data-preset="sunset" role="menuitem"><span class="dot"></span> Sunset</button>
+                <button type="button" class="theme-swatch" data-preset="sand" role="menuitem"><span class="dot"></span> Sand (light)</button>
+                <button type="button" class="theme-swatch" data-preset="soft-sepia" role="menuitem"><span class="dot"></span> Soft Sepia</button>
+                <button type="button" class="theme-swatch" data-preset="emerald" role="menuitem"><span class="dot"></span> Emerald</button>
+                <button type="button" class="theme-swatch" data-preset="frost" role="menuitem"><span class="dot"></span> Frost</button>
+                <button type="button" class="theme-swatch" data-preset="ember" role="menuitem"><span class="dot"></span> Ember</button>
+                <button type="button" class="theme-swatch" data-preset="high-contrast" role="menuitem"><span class="dot"></span> High Contrast</button>
+              </div>
+            </div>
+
+            
+            <div class="header-right-actions topbar-tools">
+                <button type="button" class="topbar-chip" id="gpuWorkerBadge" onclick="location.href='/boost'" title="GPU Boost (optional Colab/Kaggle)" aria-label="GPU Boost">
+                    <span class="topbar-chip-icon">⚡</span><span class="topbar-chip-label">Boost</span>
+                </button>
+                <button type="button" class="topbar-chip" onclick="toggleHelpModal()" title="Prompt Studio (Ctrl+K)" aria-label="Prompts">
+                    <span class="topbar-chip-icon">✨</span><span class="topbar-chip-label">Prompts</span>
+                </button>
+                <button type="button" class="topbar-chip" onclick="window.open('/upgrade.html','_self')" title="Plans & payments" aria-label="Upgrade">
+                    <span class="topbar-chip-icon">💎</span><span class="topbar-chip-label">Plans</span>
+                </button>
+                <button type="button" class="topbar-chip" onclick="window.open('/admin/search','_blank','noopener')" title="Search cache dashboard" aria-label="Search cache">
+                    <span class="topbar-chip-icon">📊</span><span class="topbar-chip-label">Cache</span>
+                </button>
+                <button type="button" class="topbar-chip" onclick="window.open('/admin/payments','_blank','noopener')" title="Payment reviews" aria-label="Payments">
+                    <span class="topbar-chip-icon">💳</span><span class="topbar-chip-label">Pay</span>
+                </button>
+                <button type="button" class="icon-btn header-btn" id="headerThemeBtn" onclick="toggleTheme()" title="Toggle theme" aria-label="Theme">🌙</button>
+                <button type="button" class="icon-btn header-btn" onclick="toggleChatFocusMode()" title="Focus / fullscreen" aria-label="Focus mode">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                </button>
+                <select class="model-selector" id="modelSelector" aria-label="Select AI model">
+                    <option value="auto">🤖 Auto (free cascade)</option>
+                    <option value="light">⚡ Light / fast (Groq→OR free)</option>
+                    <option value="groq">⚡ Groq free (fast)</option>
+                    <option value="gemini">🧠 Gemini free</option>
+                    <option value="openrouter">🌐 OpenRouter :free</option>
+                    <option value="deepseek">🌀 DeepSeek (if key)</option>
+                    <option value="ollama">🖥️ Ollama (local)</option>
+                    <option value="lmstudio">💻 LM Studio (local)</option>
+                    <option value="local">🔗 OpenAI-compat / custom</option>
+                    <option value="colab">🚀 Colab Boost</option>
+                </select>
+                <div class="status" aria-label="Connection status">
+                    <span class="status-dot" id="statusDot" aria-hidden="true"></span>
+                    <span id="statusText">Online</span>
+                </div>
+            </div>
+        </header>
+
+        <div class="unique-banner" role="note" id="uniqueBanner">
+  <div class="ub-text">Vision AI helps with <strong>PDF/exam solve</strong>, <strong>YouTube</strong> tools, optional <strong>GPU images</strong>, and <strong>Easypaisa</strong> plan upgrades — free to start.</div>
+  <button type="button" class="ub-close" onclick="this.closest('.unique-banner').remove()" aria-label="Dismiss">×</button>
+</div>
+
+        <div class="chat-container" id="chatOutput" role="log" aria-live="polite" aria-relevant="additions">
+            <div class="welcome-empty" id="welcomeEmpty">
+                <div class="welcome-orb" aria-hidden="true"></div>
+                <h2>How can I help?</h2>
+                <p>Ask anything · upload PDF/images · YouTube links · voice input</p>
+            </div>
+        </div>
+
+        <div class="input-area v3-composer">
+            <div class="free-tier-bar" id="freeTierBar">✨ Free unlimited mode · <a href="/skills.html" class="topbar-chip" title="Skills">🧩 Skills</a>
+                <a href="/upgrade.html">Support via Plans</a></div>
+            <div class="composer-hints" id="composerHints">
+            </div>
+            <div class="input-container glass-composer">
+                <button class="icon-btn tool-btn" type="button" onclick="document.getElementById('fileInput').click()" title="Upload image or file" aria-label="Upload file">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+                </button>
+                <button class="icon-btn tool-btn" type="button" id="micBtn" onclick="toggleVoiceInput()" title="Voice input" aria-label="Voice input">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+                </button>
+                <textarea id="message" rows="1" placeholder="Ask anything, drop an image, or tap the mic…" aria-label="Message input"></textarea>
+                <div class="input-actions">
+                    <button type="button" class="send-btn stop-btn" id="stopBtn" hidden onclick="stopGeneration()" title="Stop generation" aria-label="Stop">⏹</button>
+                    <button type="button" class="send-btn send-btn-v3" id="sendBtn" onclick="sendMessage()" aria-label="Send message">
+                        <span class="send-label">Send</span>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13"/><path d="M22 2l-7 20-4-9-9-4 20-7z"/></svg>
+                    </button>
+                </div>
+            </div>
+            <div class="voice-status" id="voiceStatus" hidden>Listening… speak now</div>
+            <div class="edit-actions" id="editActions" role="region" aria-label="Edit message actions">
+                <button class="btn-send-edit" onclick="sendEdit()">✅ Update Message</button>
+                <button class="btn-cancel-edit" onclick="cancelEdit()">✖ Cancel</button>
+            </div>
+            <div id="filePreviewArea" class="file-preview-area" aria-label="File previews"></div>
+            <input type="file" id="fileInput" multiple accept="image/*,.pdf,.jpg,.jpeg,.png,.bmp,.webp,.gif,.txt,.md,.csv,.docx,.pptx,.xlsx,.html,.py" capture="environment" aria-label="File upload">
+        </div>
+    </main>
+
+    <!-- SINGLE SOURCE OF TRUTH -->
+    
+    <!-- Tool IDs live in top bar; hidden stubs prevent null refs -->
+    <button id="floatingThemeToggle" hidden aria-hidden="true"></button>
+    <button id="helpBtn" hidden aria-hidden="true"></button>
+    <button id="adminBtn" hidden aria-hidden="true"></button>
+    <button id="adminPayBtn" hidden aria-hidden="true"></button>
+
+    <script src="/frontend/static/js/index.js?v=306"></script>
+    <script src="/frontend/static/js/prompt_studio.js?v=306"></script>
+
+<script>
+(function workerBadge(){
+  async function tick(){
+    try {
+      const r = await fetch('/api/workers?t=' + Date.now());
+      const d = await r.json();
+      const on = !!(d.live && d.live.ok);
+      const el = document.getElementById('gpuWorkerBadge');
+      if (!el) return;
+      el.innerHTML = on
+        ? '<span class="topbar-chip-icon" style="color:#22c55e">●</span><span class="topbar-chip-label">GPU On</span>'
+        : '<span class="topbar-chip-icon">⚡</span><span class="topbar-chip-label">Boost</span>';
+      el.title = on ? 'GPU worker online — open Boost page' : 'Optional GPU Boost (Colab/Kaggle)';
+    } catch (_) {}
+  }
+  tick();
+  setInterval(tick, 20000);
+})();
+</script>
+
+</body>
+</html>
