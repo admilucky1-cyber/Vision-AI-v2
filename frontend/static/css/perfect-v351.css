@@ -1,0 +1,21 @@
+
+/* Vision AI v3.5.1 — final polish */
+.streaming-cursor::after {
+  content: "▋";
+  margin-left: 2px;
+  animation: blink 1s step-end infinite;
+  color: #2dd4a8;
+  font-weight: 400;
+}
+@keyframes blink {
+  50% { opacity: 0; }
+}
+.message-bubble[data-stream-id] .markdown-content {
+  min-height: 1.2em;
+}
+.model-used.model-streaming {
+  background: rgba(45,212,168,0.15) !important;
+  border-color: rgba(45,212,168,0.4) !important;
+}
+/* Prevent layout jump when stream ends */
+.message-row.ai { scroll-margin-bottom: 120px; }
