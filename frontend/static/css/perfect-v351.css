@@ -1,0 +1,86 @@
+
+/* Vision AI v3.5.1 — final polish */
+.streaming-cursor::after {
+  content: "▋";
+  margin-left: 2px;
+  animation: blink 1s step-end infinite;
+  color: #2dd4a8;
+  font-weight: 400;
+}
+@keyframes blink {
+  50% { opacity: 0; }
+}
+.message-bubble[data-stream-id] .markdown-content {
+  min-height: 1.2em;
+}
+.model-used.model-streaming {
+  background: rgba(45,212,168,0.15) !important;
+  border-color: rgba(45,212,168,0.4) !important;
+}
+/* Prevent layout jump when stream ends */
+.message-row.ai { scroll-margin-bottom: 120px; }
+
+
+/* ===== v3.5.2: desktop sidebar — NEVER blur / NEVER ghost overlay ===== */
+@media (min-width: 769px) {
+  #sidebar-overlay,
+  #sidebar-overlay.active,
+  .sidebar-overlay,
+  .sidebar-overlay.active,
+  body.sidebar-open #sidebar-overlay {
+    display: none !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    pointer-events: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: transparent !important;
+  }
+  body.sidebar-open {
+    overflow: auto !important;
+  }
+  body.sidebar-open::before,
+  body.sidebar-open::after {
+    display: none !important;
+    content: none !important;
+  }
+  /* Collapsed sidebar must not leave a dim/blur strip */
+  #sidebar.rail-mode.collapsed-true,
+  #sidebar.collapsed-true {
+    width: 0 !important;
+    min-width: 0 !important;
+    max-width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    opacity: 0 !important;
+    overflow: hidden !important;
+    border: none !important;
+    pointer-events: none !important;
+    filter: none !important;
+    backdrop-filter: none !important;
+  }
+  .main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+    filter: none !important;
+    opacity: 1 !important;
+  }
+  /* Open desktop sidebar: solid, not frosted empty pane */
+  #sidebar:not(.collapsed-true):not(.rail-mode),
+  #sidebar.rail-mode:not(.collapsed-true) {
+    filter: none !important;
+    opacity: 1 !important;
+  }
+}
+
+/* Mobile overlay only when truly open */
+@media (max-width: 768px) {
+  #sidebar-overlay {
+    backdrop-filter: blur(2px);
+    background: rgba(0,0,0,0.45);
+  }
+  #sidebar-overlay:not(.active) {
+    display: none !important;
+    pointer-events: none !important;
+  }
+}
