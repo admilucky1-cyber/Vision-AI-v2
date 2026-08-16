@@ -1,0 +1,28 @@
+/* Chat surfaces */
+.message-bubble.user, .user-message .message-bubble {
+  background: var(--bubble-user);
+  color: var(--text-inverse);
+}
+.message-bubble.ai, .ai-message .message-bubble, .assistant-message .message-bubble {
+  background: var(--bubble-ai);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+.input-container, .composer, .chat-input-bar {
+  background: var(--bg-surface);
+  border-color: var(--border);
+}
+.chat-item-wrapper:hover, .sidebar-link:hover {
+  background: var(--bg-surface-hover);
+}
+.sidebar-footer, #sidebarFooter {
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+.user-profile-container {
+  background: var(--accent-soft);
+  border-radius: var(--radius-md);
+}
+.unique-banner, .welcome-banner, .announcement-banner, #promoBanner {
+  display: none;
+}

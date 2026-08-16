@@ -1,0 +1,67 @@
+/* Buttons, inputs, cards, menus */
+.btn, button.btn, .glass-btn, .send-btn, #sendBtn, .new-chat-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2);
+  min-height: 40px; padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  font-weight: 600; font-size: var(--font-size-sm);
+  transition: background-color var(--duration-fast), color var(--duration-fast), box-shadow var(--duration-fast), transform var(--duration-fast);
+}
+.btn-primary, .glass-btn, .send-btn, #sendBtn, .new-chat-btn {
+  background: var(--accent);
+  color: var(--text-inverse);
+}
+.btn-primary:hover, .glass-btn:hover, .send-btn:hover, #sendBtn:hover, .new-chat-btn:hover {
+  background: var(--accent-hover);
+}
+.btn-secondary, .btn-ghost {
+  background: var(--bg-surface-raised);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+}
+.btn-danger, .logout-item { color: var(--danger); }
+.icon-btn, .header-btn {
+  width: 40px; height: 40px; min-width: 40px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  background: transparent;
+}
+.icon-btn:hover, .header-btn:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+input, textarea, select, .glass-input, #message {
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+input::placeholder, textarea::placeholder {
+  color: var(--text-subtle);
+}
+.card, .glass-card, .plan-card, .skill-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  color: var(--text-primary);
+}
+.profile-dropdown, .chat-action-menu, .more-menu, [role="menu"] {
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  z-index: var(--z-dropdown);
+  color: var(--text-primary);
+}
+.toast, .auth-msg {
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-surface-raised);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  z-index: var(--z-toast);
+}
+.auth-msg.err, .toast.error { border-color: var(--danger); color: var(--danger); }
+.auth-msg.ok, .toast.success { border-color: var(--success); color: var(--success); }

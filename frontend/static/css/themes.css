@@ -1,0 +1,52 @@
+/* Theme engine: dark (default) / light — set via data-theme on <html> */
+:root, html[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-page: #0a1210;
+  --bg-surface: #111a17;
+  --bg-surface-raised: #17221e;
+  --bg-surface-hover: #1c2b26;
+  --bg-input: #0d1614;
+  --text-primary: #e9f4ef;
+  --text-secondary: #b7ccc4;
+  --text-muted: #8aa399;
+  --text-subtle: #6b8178;
+  --text-disabled: #55665f;
+  --text-inverse: #042f2a;
+  --border: rgba(45, 212, 191, 0.14);
+  --border-strong: rgba(45, 212, 191, 0.28);
+  --accent: #14b8a6;
+  --accent-hover: #2dd4bf;
+  --accent-soft: rgba(20, 184, 166, 0.14);
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #38bdf8;
+  --bubble-user: linear-gradient(135deg, #0f766e, #14b8a6);
+  --bubble-ai: #15221e;
+}
+html[data-theme="light"] {
+  color-scheme: light;
+  --bg-page: #f3f9f7;
+  --bg-surface: #ffffff;
+  --bg-surface-raised: #eef6f3;
+  --bg-surface-hover: #e4f0eb;
+  --bg-input: #ffffff;
+  --text-primary: #0f2924;
+  --text-secondary: #3d5a52;
+  --text-muted: #5a756c;
+  --text-subtle: #7a9188;
+  --text-disabled: #9aada6;
+  --text-inverse: #042f2a;
+  --border: rgba(13, 148, 136, 0.18);
+  --border-strong: rgba(13, 148, 136, 0.32);
+  --accent: #0d9488;
+  --accent-hover: #0f766e;
+  --accent-soft: rgba(13, 148, 136, 0.12);
+  --success: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --info: #0284c7;
+  --bubble-user: linear-gradient(135deg, #0d9488, #14b8a6);
+  --bubble-ai: #ffffff;
+  --shadow-md: 0 8px 28px rgba(15, 41, 36, 0.08);
+}
