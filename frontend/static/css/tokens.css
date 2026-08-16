@@ -1,0 +1,47 @@
+/* Vision AI design tokens — single source of truth */
+:root, [data-theme="dark"] {
+  --color-bg: #0b1210;
+  --color-surface: #121c19;
+  --color-surface-2: #182622;
+  --color-surface-3: #1e302b;
+  --color-text: #e8f2ee;
+  --color-text-muted: #8fadb0;
+  --color-text-subtle: #6b8580;
+  --color-border: rgba(45, 212, 191, 0.14);
+  --color-border-strong: rgba(45, 212, 191, 0.28);
+  --color-primary: #14b8a6;
+  --color-primary-hover: #2dd4bf;
+  --color-success: #34d399;
+  --color-warning: #fbbf24;
+  --color-danger: #f87171;
+  --color-info: #38bdf8;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.25);
+  --shadow-md: 0 8px 24px rgba(0,0,0,.35);
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-6: 24px; --space-8: 32px;
+  --font-size-xs: 12px; --font-size-sm: 13px; --font-size-md: 15px;
+  --font-size-lg: 18px; --font-size-xl: 24px;
+  --font-family: Inter, "Segoe UI", system-ui, -apple-system, sans-serif;
+  --focus-ring: 0 0 0 3px rgba(45, 212, 191, 0.35);
+  color-scheme: dark;
+}
+[data-theme="light"] {
+  --color-bg: #f4faf8;
+  --color-surface: #ffffff;
+  --color-surface-2: #eef7f4;
+  --color-surface-3: #e3f0ec;
+  --color-text: #0f2924;
+  --color-text-muted: #4a6b62;
+  --color-text-subtle: #6b8580;
+  --color-border: rgba(13, 148, 136, 0.18);
+  --color-border-strong: rgba(13, 148, 136, 0.32);
+  --color-primary: #0d9488;
+  --color-primary-hover: #0f766e;
+  --color-danger: #dc2626;
+  --shadow-md: 0 8px 24px rgba(15, 41, 36, 0.08);
+  color-scheme: light;
+}
