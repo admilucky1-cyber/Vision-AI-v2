@@ -1,0 +1,132 @@
+/* Chat layout — conversation rail + natural message height */
+#chatOutput, .chat-output, .messages-container, #messages {
+  max-width: min(1200px, calc(100vw - 48px));
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+.message-row, .message-item, .chat-message {
+  display: flex;
+  width: 100%;
+}
+.message-row.user, .message-item.user {
+  justify-content: flex-end;
+}
+.message-row.ai, .message-item.ai {
+  justify-content: flex-start;
+}
+.message-bubble {
+  height: auto !important;
+  max-height: none;
+  overflow: visible;
+  overflow-y: visible;
+  color: var(--text-primary);
+}
+.message-row.ai .message-bubble,
+.ai-message .message-bubble {
+  max-width: min(1100px, 100%);
+  width: auto;
+  background: var(--bubble-ai);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+}
+.message-row.user .message-bubble,
+.user-message .message-bubble {
+  max-width: min(820px, 92%);
+  background: var(--bubble-user);
+  color: var(--text-inverse);
+}
+/* Only code blocks scroll horizontally */
+.message-bubble pre {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+}
+.message-bubble img, .message-bubble video {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+.input-container, .composer, .chat-input-bar, #inputArea {
+  max-width: min(1200px, calc(100vw - 24px));
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+  padding-bottom: max(8px, env(safe-area-inset-bottom, 0px));
+  background: var(--bg-surface);
+  border-color: var(--border);
+}
+.unique-banner, .welcome-banner, .announcement-banner, #promoBanner {
+  display: none;
+}
+@media (max-width: 768px) {
+  #chatOutput, .chat-output, .messages-container {
+    max-width: 100%;
+    padding: 0 8px;
+  }
+  .message-row.ai .message-bubble,
+  .message-row.user .message-bubble {
+    max-width: 100%;
+  }
+}
+/* Kill forced inner scroll on AI body if legacy set max-height */
+.message-bubble .message-content,
+.message-bubble .markdown-body,
+.message-bubble .ai-content {
+  max-height: none;
+  overflow: visible;
+  height: auto;
+}
+
+/* Message action toolbar */
+.message-actions, .msg-actions, .ai-actions, .chat-msg-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+  opacity: 0.85;
+}
+.message-actions button, .msg-actions button, .ai-actions button, .msg-action-btn {
+  min-height: 36px;
+  min-width: 36px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface-raised);
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+}
+.message-actions button:hover, .msg-action-btn:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-primary);
+}
+.model-used, .model-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-bottom: 6px;
+}
+
+.msg-long-body.msg-collapsed {
+  max-height: 28rem;
+  overflow: hidden;
+  mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+}
+.msg-long-body.msg-expanded-height {
+  max-height: none;
+  overflow: visible;
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+.msg-show-more {
+  margin-top: 8px;
+}
