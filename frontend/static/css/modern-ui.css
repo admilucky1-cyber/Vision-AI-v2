@@ -1,0 +1,450 @@
+/**
+ * VISION AI v4.8 — Modern workspace layer
+ * Sits on top of legacy CSS. Does not change sidebar 900/901 behavior.
+ * Philosophy: clean surfaces by default; glass only for hero/special.
+ */
+
+/* ---------- Base surfaces (override heavy glass defaults) ---------- */
+body {
+  font-family: var(--font-family);
+  font-size: var(--font-size-md);
+  line-height: var(--line-height);
+  background: var(--color-bg) !important;
+  color: var(--color-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Reduce global glass on chrome */
+.sidebar,
+#sidebar,
+.main-header,
+.chat-container,
+.page-container {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.sidebar,
+#sidebar {
+  background: var(--color-surface) !important;
+  border-right: 1px solid var(--color-border) !important;
+  box-shadow: none !important;
+}
+
+.main-header {
+  background: color-mix(in srgb, var(--color-bg) 92%, transparent) !important;
+  border-bottom: 1px solid var(--color-border) !important;
+  box-shadow: none !important;
+  min-height: var(--header-height);
+}
+
+/* ---------- Typography hierarchy ---------- */
+h1, .page-title { font-size: var(--font-size-2xl); font-weight: var(--font-weight-semibold); letter-spacing: -0.02em; }
+h2, .section-title { font-size: var(--font-size-xl); font-weight: var(--font-weight-semibold); }
+h3 { font-size: var(--font-size-lg); font-weight: var(--font-weight-medium); }
+.muted, .text-muted, .user-plan { color: var(--color-text-muted); font-size: var(--font-size-sm); }
+
+/* ---------- Buttons ---------- */
+.btn, button.btn-primary, .btn-primary-footer, .send-btn {
+  border-radius: var(--radius-md) !important;
+  font-weight: var(--font-weight-medium) !important;
+  transition: background var(--duration-fast) var(--ease),
+              border-color var(--duration-fast) var(--ease),
+              transform var(--duration-fast) var(--ease),
+              opacity var(--duration-fast) var(--ease) !important;
+  box-shadow: none !important;
+}
+
+.btn-primary, .send-btn, button[type="submit"].btn-primary {
+  background: var(--color-accent) !important;
+  color: #0a0c10 !important;
+  border: 1px solid transparent !important;
+}
+.btn-primary:hover, .send-btn:hover {
+  filter: brightness(1.06);
+}
+
+.btn-secondary, .btn-outline {
+  background: transparent !important;
+  border: 1px solid var(--color-border) !important;
+  color: var(--color-text) !important;
+}
+.btn-ghost, .icon-btn, .header-btn {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  color: var(--color-text-muted) !important;
+}
+.btn-ghost:hover, .icon-btn:hover, .header-btn:hover {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent) !important;
+  color: var(--color-text) !important;
+}
+.btn-danger, .btn-danger-outline, .logout-item {
+  color: var(--color-danger) !important;
+}
+
+/* ---------- Sidebar nav denser / purposeful ---------- */
+.sidebar-link, .nav-item, .history-item {
+  border-radius: var(--radius-md) !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+.sidebar-link:hover, .nav-item:hover, .history-item:hover {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent) !important;
+}
+.sidebar-footer, #sidebarFooter {
+  border-top: 1px solid var(--color-border) !important;
+  background: var(--color-surface) !important;
+  backdrop-filter: none !important;
+}
+
+/* Profile panel */
+.profile-dropdown {
+  background: var(--color-surface-elevated) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-md) !important;
+  backdrop-filter: none !important;
+  min-width: 220px;
+  padding: var(--space-2) !important;
+}
+.profile-dropdown [role="menuitem"],
+.profile-dropdown a,
+.profile-dropdown button {
+  border-radius: var(--radius-sm) !important;
+  padding: var(--space-2) var(--space-3) !important;
+  font-size: var(--font-size-sm) !important;
+}
+
+/* ---------- Chat messages ---------- */
+.msg-user, .message.user, .chat-msg.user {
+  background: color-mix(in srgb, var(--color-accent) 14%, var(--color-surface)) !important;
+  border: 1px solid color-mix(in srgb, var(--color-accent) 22%, transparent) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: none !important;
+}
+.msg-assistant, .message.assistant, .chat-msg.assistant {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+.msg-actions, .message-actions {
+  opacity: 0.55;
+  transition: opacity var(--duration-fast) var(--ease);
+}
+.message:hover .msg-actions,
+.chat-msg:hover .message-actions,
+.msg-assistant:hover .msg-actions {
+  opacity: 1;
+}
+
+/* ---------- Composer (command surface) ---------- */
+.composer, .chat-input-wrap, #composer, .input-area, .chat-composer {
+  max-width: var(--composer-max);
+  margin-left: auto;
+  margin-right: auto;
+}
+.composer, .chat-input-box, .input-box, #chatInputContainer, .composer-shell {
+  background: var(--color-surface-elevated) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-sm) !important;
+  backdrop-filter: none !important;
+}
+.composer textarea,
+.chat-input,
+#userInput,
+#messageInput,
+textarea.chat-textarea {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  font-size: var(--font-size-md) !important;
+  line-height: var(--line-height) !important;
+  color: var(--color-text) !important;
+  min-height: 48px;
+}
+.composer-toolbar, .input-tools, .attach-row {
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-2) var(--space-3);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* ---------- Empty state ---------- */
+.chat-empty, .empty-state, #emptyState {
+  text-align: center;
+  padding: var(--space-12) var(--space-6);
+  max-width: 560px;
+  margin: 0 auto;
+}
+.chat-empty h1, .empty-state h1 {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.03em;
+  margin-bottom: var(--space-3);
+}
+.chat-empty p, .empty-state p {
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-6);
+}
+.suggestion-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+}
+.suggestion-chip {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--font-size-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease), border-color var(--duration-fast) var(--ease);
+}
+.suggestion-chip:hover {
+  background: var(--color-surface-elevated);
+  border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+}
+
+/* ---------- Cards: lighter ---------- */
+.card, .settings-card, .panel-card {
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+/* ---------- Overlay (keep behavior; quieter look) ---------- */
+#sidebar-overlay {
+  background: rgba(0, 0, 0, 0.45) !important;
+  backdrop-filter: blur(2px);
+}
+
+/* ---------- Code blocks ---------- */
+pre, .hljs, code.block {
+  border-radius: var(--radius-md) !important;
+  border: 1px solid var(--color-border) !important;
+}
+
+/* ---------- Scrollbars ---------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-text) 20%, transparent) transparent;
+}
+
+/* ---------- Do NOT touch drawer breakpoint ownership ---------- */
+/* Sidebar open/close remains JS visionSidebarController @ 900/901 */
+
+
+/* ===== v4.8.1 completion layer ===== */
+
+.welcome-empty, .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: min(52vh, 420px);
+  padding: var(--space-10) var(--space-6);
+  text-align: center;
+}
+.welcome-brand {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-accent);
+  margin-bottom: var(--space-3);
+}
+.welcome-empty h1, .empty-state h1 {
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.03em;
+  margin: 0 0 var(--space-3);
+  color: var(--color-text);
+}
+.welcome-empty .muted { max-width: 36ch; margin: 0 0 var(--space-6); }
+.welcome-orb { display: none; } /* legacy decoration off */
+
+.suggestion-grid {
+  width: 100%;
+  max-width: 520px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+@media (max-width: 520px) {
+  .suggestion-grid { grid-template-columns: 1fr; }
+}
+
+/* Composer shell */
+.input-area.composer {
+  padding: var(--space-3) var(--space-4) var(--space-5);
+  background: linear-gradient(to top, var(--color-bg) 70%, transparent);
+}
+.composer-shell, .input-container.composer-shell {
+  max-width: var(--composer-max);
+  margin: 0 auto;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface-elevated) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-lg) !important;
+  box-shadow: var(--shadow-sm) !important;
+  backdrop-filter: none !important;
+}
+.composer-shell textarea#message {
+  flex: 1;
+  resize: none;
+  max-height: 160px;
+}
+.send-btn-v3 {
+  border-radius: var(--radius-md) !important;
+  min-width: 44px;
+  height: 40px;
+}
+
+/* Settings two-column (desktop) */
+.settings-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: var(--space-6);
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: var(--space-6);
+}
+.settings-nav {
+  position: sticky;
+  top: var(--space-4);
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+.settings-nav a, .settings-nav button {
+  text-align: left;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+.settings-nav a:hover, .settings-nav button:hover,
+.settings-nav a.active, .settings-nav button.active {
+  background: color-mix(in srgb, var(--color-text) 6%, transparent);
+  color: var(--color-text);
+}
+.settings-panels .card, .settings-main .card {
+  margin-bottom: var(--space-4);
+}
+@media (max-width: 900px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+    padding: var(--space-4);
+  }
+  .settings-nav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+}
+
+/* Studio professional workspace */
+body.studio-page, .studio-wrap, .wrap {
+  background: var(--color-bg);
+}
+.studio-wrap header, .wrap > header {
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.studio-wrap h1, .wrap h1 {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.02em;
+}
+.studio-wrap .tabs, .wrap .tabs {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-4);
+}
+.studio-wrap .tabs button, .wrap .tabs button {
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--font-size-sm);
+}
+.studio-wrap .tabs button.active, .wrap .tabs button.active {
+  background: color-mix(in srgb, var(--color-accent) 16%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+  color: var(--color-text);
+}
+.studio-wrap label, .wrap label {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  display: block;
+  margin: var(--space-3) 0 var(--space-1);
+}
+.studio-wrap input, .studio-wrap select, .studio-wrap textarea,
+.wrap input, .wrap select, .wrap textarea {
+  width: 100%;
+  background: var(--color-surface) !important;
+  border: 1px solid var(--color-border) !important;
+  border-radius: var(--radius-md) !important;
+  color: var(--color-text);
+  padding: var(--space-2) var(--space-3);
+}
+
+/* Upgrade pricing clarity */
+.pricing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: var(--space-4);
+  max-width: 1000px;
+  margin: var(--space-8) auto;
+  padding: 0 var(--space-4);
+}
+.pricing-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+}
+.pricing-card.featured {
+  border-color: color-mix(in srgb, var(--color-accent) 50%, var(--color-border));
+  box-shadow: var(--shadow-md);
+}
+.pricing-card h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-xl);
+}
+.pricing-card .price {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: -0.03em;
+  margin-bottom: var(--space-4);
+}
+
+/* Maintenance actions — not primary */
+.sidebar-secondary-action,
+button.sidebar-secondary,
+.sidebar-link.sidebar-secondary {
+  opacity: 0.65;
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-normal) !important;
+}
+.sidebar-secondary-action:hover,
+button.sidebar-secondary:hover {
+  opacity: 1;
+}
