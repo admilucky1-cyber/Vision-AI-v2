@@ -1,0 +1,14 @@
+/* Force drawer boundary to 900/901 (sidebar only) */
+@media (max-width: 900px) {
+  #sidebar-overlay.active { display: block; }
+  body.sidebar-open { overflow: hidden; }
+}
+@media (min-width: 901px) {
+  #sidebar-overlay,
+  #sidebar-overlay.active {
+    display: none !important;
+  }
+  #sidebar.open-mobile {
+    /* desktop ignores mobile open class */
+  }
+}

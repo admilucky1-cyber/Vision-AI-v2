@@ -1,0 +1,24 @@
+/* Container: ChatShell */
+.container-chat-shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1 1 auto;
+  background: var(--color-bg);
+}
+
+.container-chat-shell [data-role="message-list"],
+.container-chat-shell #chatBox {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: var(--space-4) var(--space-4) var(--space-6);
+  scroll-behavior: smooth;
+}
+
+@media (min-width: 901px) {
+  .container-chat-shell [data-role="message-list"],
+  .container-chat-shell #chatBox {
+    padding-left: max(var(--space-4), calc(50% - 360px));
+    padding-right: max(var(--space-4), calc(50% - 360px));
+  }
+}

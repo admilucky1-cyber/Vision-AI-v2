@@ -1,0 +1,88 @@
+/* Vision AI Workspace shell polish (v5.1.0) */
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.main-content {
+  background: var(--color-bg);
+  min-height: 100dvh;
+}
+
+/* Top bar */
+.chat-header,
+.topbar,
+.header-bar {
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.topbar-chip {
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border-subtle);
+  background: var(--color-surface-elevated);
+  color: var(--color-text-muted);
+  transition: background var(--duration-fast), border-color var(--duration-fast), color var(--duration-fast);
+}
+.topbar-chip:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+  background: var(--color-accent-soft);
+}
+
+.new-chat-btn {
+  border-radius: var(--radius-md);
+  background: var(--color-accent-soft);
+  border: 1px solid transparent;
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.new-chat-btn:hover {
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 22%, transparent);
+}
+
+.model-selector {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-elevated);
+  color: var(--color-text);
+  min-height: 40px;
+}
+
+/* Empty state beauty */
+.empty-state,
+.welcome-screen {
+  max-width: 420px;
+  margin: 0 auto;
+  text-align: center;
+  padding: var(--space-10) var(--space-4);
+}
+.empty-state h1,
+.welcome-screen h1 {
+  font-size: var(--font-size-2xl);
+  letter-spacing: -0.02em;
+}
+.suggestion-chip,
+.prompt-chip {
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  padding: var(--space-2) var(--space-4);
+  transition: all var(--duration-fast) var(--ease);
+}
+.suggestion-chip:hover,
+.prompt-chip:hover {
+  border-color: var(--color-accent);
+  color: var(--color-text);
+  box-shadow: var(--shadow-glow);
+}
+
+/* Unify mobile drawer breakpoint to 900 (override legacy 768 where safe) */
+@media (max-width: 900px) {
+  .main-content {
+    width: 100%;
+  }
+}
