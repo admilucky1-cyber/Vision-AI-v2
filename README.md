@@ -1,26 +1,43 @@
-# Vision AI v2 (legacy repo name)
+# Vision AI
 
-> **This repository has been rebranded.**
->
-> **Canonical repo:** [admilucky1-cyber/Vision-AI](https://github.com/admilucky1-cyber/Vision-AI)  
-> **Display name:** **Vision AI**  
-> **Latest product line:** v5.4.0 Aether Forge
+**Production multi-modal AI workspace** — chat, private RAG, routing profiles, GPU boost, and Aether-ready UI.
 
-Please use the new repository for updates and documentation:
+> **Product name:** Vision AI  
+> **This repository** (`Vision-AI-v2`) contains the **full application source** (`main.py`, `routes/`, `services/`, `frontend/`, …).
 
-**https://github.com/admilucky1-cyber/Vision-AI**
+**Rename tip (recommended):**  
+On GitHub → **Settings** → **General** → **Repository name** → change `Vision-AI-v2` → `Vision-AI`  
+(If a new empty `Vision-AI` repo exists, delete that empty one first, then rename this repo.)
 
 ---
 
-## Legacy description
-
-Production-grade multi-modal AI assistant with document RAG, real-time search, diagram & image generation, medical/anatomy educational mode, QR code PKR payments, Telegram/WhatsApp alerts, and One-Click Colab/Kaggle GPU Boost.
-
-**Live (historical):** [vision-ai-v2-production.up.railway.app](https://vision-ai-v2-production.up.railway.app)
+## Quick start
 
 ```bash
-git clone https://github.com/admilucky1-cyber/Vision-AI.git
-cd Vision-AI
+git clone https://github.com/admilucky1-cyber/Vision-AI-v2.git
+cd Vision-AI-v2
+cp .env.example .env   # add API keys
+pip install -r requirements.txt
+python run.py
+# or: python main.py
 ```
 
-License: MIT
+Open **http://127.0.0.1:5050**
+
+## Layout
+
+| Path | Role |
+|------|------|
+| `main.py` | FastAPI app entry |
+| `run.py` | Production launcher |
+| `routes/` | HTTP API |
+| `services/` | LLM, RAG, search, workers |
+| `frontend/` | Web UI |
+
+## Deploy
+
+- Railway / Render / Docker — see `DEPLOY.md`, `Dockerfile`, `railway.toml`
+
+## License
+
+MIT
